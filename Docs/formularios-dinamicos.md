@@ -99,7 +99,8 @@ model RespuestaPregunta {
 // Permisos por usuario (punto 3 — "quien lo puede o no ver o editar").
 // Si un Formulario no tiene ninguna fila en FormularioPermiso, el acceso
 // por defecto es el nivel de Área del usuario (ver usuarios-perfiles.md).
-// Una fila aquí es una EXCEPCIÓN explícita a ese default.
+// Una fila aquí es una AMPLIACIÓN explícita a ese default — nunca una
+// restricción (confirmado con Christian 04-10-2026: solo se amplía, no se niega).
 model FormularioPermiso {
   id            Int      @id @default(autoincrement())
   formularioId  Int
@@ -117,14 +118,14 @@ model FormularioPermiso {
 
 1. **Crear formulario** (usuario con `TOTAL` en el área): nombre, área, categoría (existente o nueva), agrega preguntas una a una (texto + tipo + obligatoria + ¿permite foto?), guarda. Queda `activo = true` de inmediato — no hay paso de "publicar" aparte.
 2. **Responder formulario** (usuario con acceso — nivel de área o `FormularioPermiso.puedeEditar`): selecciona obra → selecciona formulario de su categoría → responde cada pregunta según su tipo → si alguna pregunta tiene `permiteFoto`, puede adjuntar una imagen → guarda como `RespuestaFormulario`.
-3. **Restringir un formulario** (excepción): el creador o el Administrador agrega filas en `FormularioPermiso` para usuarios específicos que deban ver/editar un formulario fuera de lo que su nivel de área ya permite, o para **negar** el acceso a alguien que sí tiene nivel de área (ver regla en §6).
+3. **Ampliar acceso a un formulario** (excepción): el creador o el Administrador agrega filas en `FormularioPermiso` para usuarios específicos que deban ver/editar un formulario fuera de lo que su nivel de área ya permite. Confirmado 04-10-2026: **solo amplía, nunca niega** — ver regla en §6.
 
 ## 6. Reglas
 
 - **Tipos de respuesta soportados en Etapa 1** (punto 2 del pedido de Christian): `CHECKBOX`, `SELECCION_MULTIPLE`, `NUMERO`, `TEXTO`, `TEXTO_LARGO`. El `CHECKBOX` reusa el patrón Cumple/No cumple/N.A. ya validado en el mockup; no es un booleano simple.
 - **Selección de obra**: vive en `RespuestaFormulario`, no en `Formulario` — un formulario es una plantilla reutilizable en cualquier obra; quien la selecciona es quien la responde, no quien la crea. (`Formulario.requiereObra` existe por si en el futuro se necesita un formulario que no dependa de obra — hoy siempre es `true`.)
 - **Registro fotográfico**: es una capacidad por pregunta (`Pregunta.permiteFoto`), no un tipo de respuesta aparte — una pregunta `CHECKBOX` puede o no pedir foto, igual que una `TEXTO`.
-- **Permisos**: el default es "todo el que tenga nivel de área ≥ LECTURA ve el formulario, y con TOTAL lo responde". `FormularioPermiso` es solo para excepciones — tanto para dar acceso a alguien que por su área no lo tendría, como para **quitárselo** a alguien específico aunque su área se lo daría (una fila con `puedeVer = false` explícito gana sobre el nivel de área).
+- **Permisos**: el default es "todo el que tenga nivel de área ≥ LECTURA ve el formulario, y con TOTAL lo responde". `FormularioPermiso` es **solo para ampliar** — da acceso extra a alguien que por su área no lo tendría. Confirmado con Christian (04-10-2026): no existe el caso de negar/restringir; el nivel de área nunca se le quita a nadie vía `FormularioPermiso`. Una fila siempre otorga (`puedeVer`/`puedeEditar` describen cuánto acceso adicional, nunca una resta).
 - Una plantilla con respuestas ya registradas no se puede eliminar — solo desactivar (`activo = false`); las respuestas existentes quedan intactas.
 
 ## 7. Validaciones
@@ -146,5 +147,5 @@ model FormularioPermiso {
 
 - [ ] Confirmar si además de los 5 tipos listados por Christian hace falta `FECHA` o `FIRMA` como tipo de respuesta propio (el mockup EPP ya usa "firma realizó/revisó" como campo — hoy no tiene tipo dedicado).
 - [ ] Definir dónde se guardan las fotos (storage) y el límite de tamaño/cantidad por pregunta.
-- [ ] Definir si una `CategoriaFormulario` se puede crear al vuelo desde el mismo formulario de creación, o si es un mantenedor aparte que hay que crear antes (ver `00-mantenedores-requeridos.md`).
-- [ ] Confirmar la nota de §6 sobre `FormularioPermiso` negando acceso explícito — Christian pidió "permisos por usuario", falta confirmar si el caso de **restringir** (negar) es necesario o solo el de **ampliar**.
+- [x] Definir si una `CategoriaFormulario` se puede crear al vuelo desde el mismo formulario de creación — **confirmado 04-10-2026: sí, 100% dinámico**, sin lista cerrada ni mantenedor aparte previo (ver `00-mantenedores-requeridos.md`).
+- [x] Confirmar la nota de §6 sobre `FormularioPermiso` negando acceso explícito — **confirmado 04-10-2026: solo ampliar**, nunca negar (ver nota en §6).

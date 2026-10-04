@@ -11,7 +11,7 @@ Documentar las convenciones transversales del sistema (autorización, visibilida
 | Rol | Acceso | Uso principal |
 |---|---|---|
 | Administrador | Ambas (Prevención + Técnica) | Control total: activación de módulos, gestión de obras, usuarios. Asignado por obra — recibe notificación en cada revisión. |
-| Jefe Prevencionista | Ambas | Gestión de hallazgos de seguridad a nivel general. |
+| Jefe Prevencionista | Web Prevención (confirmado 04-10-2026; difiere de "ambas" en alcop-esquema.html §08 — ver `usuarios-perfiles.md` §6) | Gestión de hallazgos de seguridad a nivel general. |
 | Supervisor de obra | Ambas | Seguimiento de hallazgos y checklists en terreno. |
 | Prevencionista de obra | Web Prevención | Registro de checklists, hallazgos y visitas. Asignado por obra — recibe notificación en cada revisión. |
 | Jefe de terreno | Web Técnica | Visita técnica y checklists LCH-AT. Asignado por obra — recibe notificación en cada revisión. |
@@ -39,8 +39,8 @@ Documentar las convenciones transversales del sistema (autorización, visibilida
 - [ ] Definir si las notificaciones automáticas (sección 06/07) van por BullMQ + Resend o por otro proveedor de email que ya use ALCOP
 - [ ] Definir proveedor de IA real (hoy: `AI_PROVIDER=mock`) y costo asociado (ver alcop-esquema.html §11: $60.000–$400.000 CLP/año según uso)
 - [ ] Definir proveedor/ubicación de hosting (ver alcop-esquema.html §11: $150.000–$450.000 CLP/año según usuarios/proveedor)
-- [ ] Confirmar nivelTecnica de "Jefe Prevencionista" (ver `usuarios-perfiles.md` §6)
-- [ ] Confirmar si `FormularioPermiso` necesita negar acceso explícito o solo ampliarlo (ver `formularios-dinamicos.md` §10)
+- [x] Confirmar nivelTecnica de "Jefe Prevencionista" — **SIN_ACCESO**, confirmado 04-10-2026 (ver `usuarios-perfiles.md` §6).
+- [x] Confirmar si `FormularioPermiso` necesita negar acceso explícito o solo ampliarlo — **solo ampliar**, confirmado 04-10-2026 (ver `formularios-dinamicos.md` §10).
 
 ## 6. En stand by
 

@@ -102,7 +102,7 @@ enum RolObra {
 | Jefe de terreno | SIN_ACCESO | TOTAL |
 | Trabajador | LECTURA | SIN_ACCESO |
 
-> **Ojo:** en alcop-esquema.html §08, "Jefe Prevencionista" y "Supervisor de obra" ambos figuran como "ambas áreas" — pero por nombre, "Jefe Prevencionista" suena específico a Prevención. **Pendiente confirmar con Christian** si Jefe Prevencionista debe tener `nivelTecnica = LECTURA` (puede ver pero no editar Técnica) en vez de `SIN_ACCESO`, antes de cargar el seed definitivo.
+> **Confirmado con Christian (04-10-2026):** `nivelTecnica = SIN_ACCESO` para "Jefe Prevencionista" — el perfil queda 100% acotado a Prevención. Esto difiere deliberadamente de alcop-esquema.html §08, donde "Jefe Prevencionista" y "Supervisor de obra" figuran ambos como "ambas áreas" (redacción comercial simplificada); el modelo técnico es más preciso y prevalece sobre esa tabla.
 
 ## 7. Validaciones
 
@@ -121,6 +121,6 @@ enum RolObra {
 
 ## 10. Pendientes
 
-- [ ] Confirmar nivelTecnica de "Jefe Prevencionista" (ver nota en §6).
+- [x] Confirmar nivelTecnica de "Jefe Prevencionista" — **SIN_ACCESO**, confirmado 04-10-2026 (ver nota en §6).
 - [ ] Definir si el panel de Usuarios y Admin permite crear Perfiles nuevos (niveles custom) o si los 6 perfiles de la tabla son fijos y no editables desde la UI en la Etapa 1.
 - [ ] Definir SLA/journal de auditoría cuando se reemplaza un `UsuarioObra` (¿se notifica al saliente?).

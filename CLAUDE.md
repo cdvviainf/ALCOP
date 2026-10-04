@@ -325,6 +325,7 @@ Ver `docker-compose.yml` en la raíz del proyecto (PostgreSQL 17, Redis 7, pgAdm
 - Modelo de accesos simplificado respecto a FAS: `Perfil` tiene nivel de acceso por Área (Prevención/Técnica), no un sistema de `ItemMenu` granular — no se justifica la complejidad para 2 áreas.
 - Formularios 100% dinámicos desde la Etapa 1 (no hay formularios hardcodeados en código): tipos de respuesta Checkbox, Selección múltiple, Número, Texto, Texto largo; foto opcional por pregunta; permisos de ver/editar por usuario además del nivel de área.
 - Definición técnica de la Etapa 2 (App móvil) puesta en stand by el 04-10-2026 — foco 100% en Etapa 1 por ahora.
+- Reglas de acceso y permisos cerradas el 04-10-2026: "Jefe Prevencionista" queda `SIN_ACCESO` en Técnica (difiere de la redacción "ambas" de alcop-esquema.html §08); `FormularioPermiso` solo amplía acceso, nunca lo niega; `CategoriaFormulario` es 100% dinámico, sin lista cerrada previa.
 
 ---
 
