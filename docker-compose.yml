@@ -1,0 +1,130 @@
+services:
+
+  # ─── PostgreSQL 17 ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: alcop_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: alcop_user
+      POSTGRES_PASSWORD: alcop_pass
+      POSTGRES_DB: alcop_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5434:5432"
+    volumes:
+      - alcop_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alcop_user -d alcop_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis 7 ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: alcop_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass alcop_redis_pass
+    ports:
+      - "6380:6379"
+    volumes:
+      - alcop_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "alcop_redis_pass", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── pgAdmin 4 ──────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: alcop_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@viain.cl
+      PGADMIN_DEFAULT_PASSWORD: alcop_admin_pass
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5051:80"
+    volumes:
+      - alcop_pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── Redis Commander ─────────────────────────────────────────────────────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: alcop_redis_ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: "local:redis:6379:0:alcop_redis_pass"
+    ports:
+      - "8082:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ─── API (alcop-api) ─────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./alcop-api
+      dockerfile: Dockerfile.dev
+    container_name: alcop_api
+    restart: unless-stopped
+    ports:
+      - "3011:3001"
+    environment:
+      DATABASE_URL: postgresql://alcop_user:alcop_pass@postgres:5432/alcop_db
+      REDIS_URL: redis://:alcop_redis_pass@redis:6379
+      NODE_ENV: development
+      PORT: 3001
+      BETTER_AUTH_SECRET: alcop_super_secret_key_cambiar_en_produccion_32c
+      BETTER_AUTH_URL: http://localhost:3011
+      EMAIL_FROM: noreply@alcop.cl
+      CORS_ORIGIN: http://localhost:3010
+    volumes:
+      - ./alcop-api:/app
+      - alcop_api_node_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── Web (alcop-web) ─────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./alcop-web
+      dockerfile: Dockerfile.dev
+    container_name: alcop_web
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3011/api
+      INTERNAL_API_URL: http://api:3001
+      NEXT_PUBLIC_SENTRY_DISABLED: "true"
+    volumes:
+      - ./alcop-web:/app
+      - alcop_web_node_modules:/app/node_modules
+      - alcop_web_next:/app/.next
+    depends_on:
+      - api
+
+volumes:
+  alcop_postgres_data:
+    driver: local
+  alcop_redis_data:
+    driver: local
+  alcop_pgadmin_data:
+    driver: local
+  alcop_api_node_modules:
+    driver: local
+  alcop_web_node_modules:
+    driver: local
+  alcop_web_next:
+    driver: local

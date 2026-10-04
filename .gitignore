@@ -1,0 +1,29 @@
+# Env files con valores reales — NUNCA subir al repo
+.env.demo
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+
+# Estado local del ciclo Claude -> Codex QA (aún no versionado)
+.claude/
+.agents/
+.codex/
+.qa-workflow/
+
+# Node
+node_modules/
+
+# Template original (referencia local, no forma parte del proyecto)
+template-starter/
+
+# Duplicado de docker/pgadmin-servers.json
+pgadmin-servers.json
+
+# Artefactos de depuración del MCP de Playwright
+.playwright-mcp/
