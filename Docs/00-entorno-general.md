@@ -32,8 +32,16 @@ Documentar las convenciones transversales del sistema (autorización, visibilida
 
 ## 5. Pendientes
 
-- [ ] Modelo de datos de Usuario/Perfil/PerfilAcceso/ItemMenu (spec `usuarios-perfiles.md`)
+- [x] Modelo de datos de Usuario/Perfil (spec `usuarios-perfiles.md`, cerrado 04-10-2026) — resuelto con nivel de acceso por Área, sin ItemMenu granular (más simple que FAS).
+- [x] Motor de formularios dinámicos (spec `formularios-dinamicos.md`, cerrado 04-10-2026).
+- [x] Listado de mantenedores requeridos (`00-mantenedores-requeridos.md`, cerrado 04-10-2026).
 - [ ] Modelo de Obra y su relación con Núcleo (spec `nucleo-compartido.md`)
 - [ ] Definir si las notificaciones automáticas (sección 06/07) van por BullMQ + Resend o por otro proveedor de email que ya use ALCOP
 - [ ] Definir proveedor de IA real (hoy: `AI_PROVIDER=mock`) y costo asociado (ver alcop-esquema.html §11: $60.000–$400.000 CLP/año según uso)
 - [ ] Definir proveedor/ubicación de hosting (ver alcop-esquema.html §11: $150.000–$450.000 CLP/año según usuarios/proveedor)
+- [ ] Confirmar nivelTecnica de "Jefe Prevencionista" (ver `usuarios-perfiles.md` §6)
+- [ ] Confirmar si `FormularioPermiso` necesita negar acceso explícito o solo ampliarlo (ver `formularios-dinamicos.md` §10)
+
+## 6. En stand by
+
+- **Etapa 2 (App móvil nativa):** Christian pidió (04-10-2026) dejar su definición técnica en pausa — no especificar módulos ni modelo de datos de la app móvil todavía. No afecta lo ya comprometido comercialmente (ver `CLAUDE.md` §11).

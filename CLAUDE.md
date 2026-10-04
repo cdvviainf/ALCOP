@@ -11,6 +11,8 @@
 >
 > **Metodología spec-first (igual que en FAS):** antes de implementar cada módulo se escribe su spec en `Docs/<modulo>.md` con todas las reglas de negocio, modelo de datos y casos borde resueltos vía preguntas y respuestas con Christian. Hasta que un spec esté cerrado, cualquier detalle no definido en `alcop-esquema.html` se pregunta — nunca se inventa.
 >
+> **Specs cerrados (04-10-2026):** `usuarios-perfiles.md` (perfil con nivel de acceso por Área, no por ítem de menú individual — más simple que el modelo de FAS) y `formularios-dinamicos.md` (motor de formularios 100% dinámico: Formulario → Pregunta con `tipoRespuesta` [Checkbox/Selección múltiple/Número/Texto/Texto largo], obligatoria/opcional, foto opcional por pregunta, permisos por usuario vía `FormularioPermiso`). Ambos superseden cualquier mención anterior de "ItemMenu" para ALCOP — ese patrón de FAS no aplica aquí, es más simple.
+>
 > **Convenciones canónicas (iguales a FAS/IFK):**
 > - **IDs:** `id Int @id @default(autoincrement())` en todas las tablas.
 > - **Autorización:** por **perfil + ítem de menú + nivel** (`SIN_ACCESO`/`LECTURA`/`TOTAL`), no por rol fijo — ver sección 08 de `alcop-esquema.html` y el spec `Docs/usuarios-perfiles.md`.
@@ -41,6 +43,12 @@ Se conserva del template: TanStack Tables server-side (search/filter/paginación
 - Adaptador genérico de IA (mismo patrón que el adaptador DTE de FAS): `src/modules/ai/analisis-ia.adapter.ts`, configurado por variable de entorno (`AI_PROVIDER=gemini|mock`).
 - El flujo es igual en Prevención y Técnica: fotos → adaptador IA → informe en el formato fijo (Obra, Inspector, Fecha y hora, Ubicación, Imágenes, Observaciones) → editable por el usuario antes de guardar como reporte definitivo.
 - En desarrollo, usar `AI_PROVIDER=mock` (respuestas dummy) hasta tener la cuenta/API key de Gemini de ALCOP.
+
+### Decisión canónica — Etapa 2 (App móvil) en stand by
+
+- Christian pidió (04-10-2026) dejar la **definición técnica** de la app móvil nativa en stand by — no especificar módulos, pantallas ni modelo de datos de Etapa 2 todavía.
+- Esto NO afecta lo ya comprometido comercialmente con ALCOP (145 UF totales, Etapa 2 = 63 UF, Gantt de la sección 09 de `alcop-esquema.html`) — es solo una pausa en el trabajo de especificación técnica hasta que Etapa 1 esté más avanzada.
+- Mientras esté en stand by: no crear `Docs/app-movil.md`, no iniciar `alcop-mobile/`.
 
 ---
 
@@ -200,15 +208,18 @@ alcop-web/
 
 ### Schema Prisma — mapa de modelos (a especificar en `Docs/`)
 
-| Spec (`Docs/`) | Estado | Modelos principales (preliminar, sujeto a spec) |
+| Spec (`Docs/`) | Estado | Modelos principales |
 |---|---|---|
-| `00-entorno-general.md` | Pendiente de spec | Convenciones transversales, visibilidad por perfil |
-| `usuarios-perfiles.md` | Pendiente de spec | Usuario, Perfil, PerfilAcceso, ItemMenu (ver sección 08 de alcop-esquema.html) |
-| `nucleo-compartido.md` | Pendiente de spec | Obra, FormularioDinamico(+Item), PanelResumen |
+| `00-entorno-general.md` | Borrador inicial | Convenciones transversales, visibilidad por perfil |
+| `00-mantenedores-requeridos.md` | **Cerrado** | Listado consolidado de catálogos (Area, CategoriaFormulario, NivelRiesgo, EtapaNido, RolObra, etc.) |
+| `usuarios-perfiles.md` | **Cerrado** | Area, Usuario, Perfil (nivel por área), UsuarioObra |
+| `formularios-dinamicos.md` | **Cerrado** | CategoriaFormulario, Formulario, Pregunta, RespuestaFormulario, RespuestaPregunta, FormularioPermiso |
+| `nucleo-compartido.md` | Pendiente de spec | Obra, PanelResumen |
 | `prevencion.md` | Pendiente de spec | Hallazgo, VisitaPrevencion, AnalisisIA |
 | `tecnica.md` | Pendiente de spec | VisitaTecnica, HitoEtapa (nidos/puntales), AnalisisIA |
 | `reportes.md` | Pendiente de spec | Reporte (PDF generado), vínculo a Formulario/Visita/Hallazgo/AnalisisIA |
 | `alertas.md` | Pendiente de spec | Notificación por obra (Administrador, Jefe de Terreno, Prevencionista) |
+| `app-movil.md` | **En stand by** — no especificar aún | — |
 
 > Cada spec sigue el formato canónico de 10 secciones usado en FAS: Propósito, Actores, Glosario, Modelo de Datos, Flujos, Reglas, Validaciones, Estados, Integraciones, Pendientes.
 
@@ -311,6 +322,9 @@ Ver `docker-compose.yml` en la raíz del proyecto (PostgreSQL 17, Redis 7, pgAdm
 - Stack técnico alineado al de FAS (Node/Fastify/Prisma/PostgreSQL + Next.js/shadcn) para reutilizar convenciones, tooling y agentes de desarrollo ya rodados en VIAIN.
 - Costos de hosting/VPS y de API de IA corren por cuenta de ALCOP, fuera de la propuesta (sección 11 de alcop-esquema.html) — igual que las suscripciones Google Play / Apple Developer para la Etapa 2.
 - Proveedor de IA aún no elegido — se parte con `AI_PROVIDER=mock` y adaptador genérico, igual que el patrón de adaptador DTE de FAS.
+- Modelo de accesos simplificado respecto a FAS: `Perfil` tiene nivel de acceso por Área (Prevención/Técnica), no un sistema de `ItemMenu` granular — no se justifica la complejidad para 2 áreas.
+- Formularios 100% dinámicos desde la Etapa 1 (no hay formularios hardcodeados en código): tipos de respuesta Checkbox, Selección múltiple, Número, Texto, Texto largo; foto opcional por pregunta; permisos de ver/editar por usuario además del nivel de área.
+- Definición técnica de la Etapa 2 (App móvil) puesta en stand by el 04-10-2026 — foco 100% en Etapa 1 por ahora.
 
 ---
 
