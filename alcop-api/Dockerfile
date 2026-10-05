@@ -16,7 +16,9 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk add --no-cache openssl
+# openssl → Prisma.
+# tini → init (PID 1) que reap-ea los procesos zombie que deja Chromium headless
+#   (Playwright) y propaga SIGTERM para un apagado limpio de Fastify.
 # Chromium del sistema para el motor de documentos (Playwright — Reportes
 # y Análisis IA adjuntan PDF): el binario que Playwright intenta descargar
 # por su cuenta es glibc y no corre en Alpine (musl) — se usa el paquete
@@ -24,6 +26,8 @@ RUN apk add --no-cache openssl
 # (config/env.ts). --ignore-scripts más abajo ya evita que el postinstall
 # de Playwright intente esa descarga igual.
 RUN apk add --no-cache \
+      openssl \
+      tini \
       chromium \
       nss \
       freetype \
@@ -37,5 +41,13 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/dist ./dist
+# Usuario no-root (paridad con alcop-web y buena práctica, en especial con Chromium).
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 fastify \
+    && chown -R fastify:nodejs /app
+USER fastify
 EXPOSE 3001
+# tini como PID 1. El CLI `prisma` viene en dependencies (ver scaffold), así que
+# `migrate deploy` NO descarga nada en runtime.
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]

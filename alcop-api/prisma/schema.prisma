@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum NivelAcceso {
+  SIN_ACCESO
+  LECTURA
+  TOTAL
+}
+
+enum RolObra {
+  ADMINISTRADOR
+  JEFE_DE_TERRENO
+  PREVENCIONISTA
+}
+
+enum TipoRespuesta {
+  CHECKBOX
+  SELECCION_MULTIPLE
+  NUMERO
+  TEXTO
+  TEXTO_LARGO
+}
+
+model Area {
+  id          Int      @id @default(autoincrement())
+  codigo      String   @unique // "PREVENCION" | "TECNICA"
+  nombre      String
+  categorias  CategoriaFormulario[]
+  formularios Formulario[]
+}
+
+model Usuario {
+  id          String   @id @default(cuid()) // String — referencia Better Auth
+  nombre      String
+  email       String   @unique
+  activo      Boolean  @default(true)
+  perfilId    Int
+  perfil      Perfil   @relation(fields: [perfilId], references: [id])
+  obras       UsuarioObra[]
+  respuestas  RespuestaFormulario[]
+  permisos    FormularioPermiso[]
+  creadoEn    DateTime @default(now())
+  creadoPor   String?
+  eliminadoEn DateTime?
+}
+
+model Perfil {
+  id              Int         @id @default(autoincrement())
+  nombre          String
+  nivelPrevencion NivelAcceso @default(SIN_ACCESO)
+  nivelTecnica    NivelAcceso @default(SIN_ACCESO)
+  usuarios        Usuario[]
+  creadoEn        DateTime    @default(now())
+  eliminadoEn     DateTime?
+}
+
+model UsuarioObra {
+  id        Int      @id @default(autoincrement())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  obraId    Int
+  obra      Obra     @relation(fields: [obraId], references: [id])
+  rolObra   RolObra
+  creadoEn  DateTime @default(now())
+
+  @@unique([obraId, rolObra])
+}
+
+// Obra es MÍNIMA y PROVISIONAL — el spec nucleo-compartido.md está pendiente.
+// Campos según Docs/00-mantenedores-requeridos.md #10.
+model Obra {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  direccion   String?
+  activo      Boolean  @default(true)
+  fechaInicio DateTime?
+  usuarios    UsuarioObra[]
+  respuestas  RespuestaFormulario[]
+  creadoEn    DateTime @default(now())
+  creadoPor   String?
+  eliminadoEn DateTime?
+}
+
+model CategoriaFormulario {
+  id          Int          @id @default(autoincrement())
+  areaId      Int
+  area        Area         @relation(fields: [areaId], references: [id])
+  codigo      String
+  nombre      String
+  formularios Formulario[]
+}
+
+model Formulario {
+  id           Int      @id @default(autoincrement())
+  codigo       String   @unique
+  nombre       String
+  areaId       Int
+  area         Area     @relation(fields: [areaId], references: [id])
+  categoriaId  Int
+  categoria    CategoriaFormulario @relation(fields: [categoriaId], references: [id])
+  requiereObra Boolean  @default(true)
+  activo       Boolean  @default(true)
+  preguntas    Pregunta[]
+  permisos     FormularioPermiso[]
+  respuestas   RespuestaFormulario[]
+  creadoEn     DateTime @default(now())
+  creadoPor    String
+  eliminadoEn  DateTime?
+}
+
+model Pregunta {
+  id            Int      @id @default(autoincrement())
+  formularioId  Int
+  formulario    Formulario @relation(fields: [formularioId], references: [id])
+  orden         Int
+  texto         String
+  tipoRespuesta TipoRespuesta
+  obligatoria   Boolean  @default(true)
+  permiteFoto   Boolean  @default(false)
+  opciones      String[]
+  respuestas    RespuestaPregunta[]
+}
+
+model RespuestaFormulario {
+  id           Int      @id @default(autoincrement())
+  formularioId Int
+  formulario   Formulario @relation(fields: [formularioId], references: [id])
+  obraId       Int
+  obra         Obra     @relation(fields: [obraId], references: [id])
+  usuarioId    String
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
+  fechaHora    DateTime @default(now())
+  respuestas   RespuestaPregunta[]
+  creadoEn     DateTime @default(now())
+}
+
+model RespuestaPregunta {
+  id                     Int      @id @default(autoincrement())
+  respuestaFormularioId  Int
+  respuestaFormulario    RespuestaFormulario @relation(fields: [respuestaFormularioId], references: [id])
+  preguntaId             Int
+  pregunta               Pregunta @relation(fields: [preguntaId], references: [id])
+  valorTexto             String?
+  valorNumero            Decimal?
+  valorCheckbox          String?
+  valorSeleccionMultiple String[]
+  fotoUrl                String?
+}
+
+model FormularioPermiso {
+  id           Int      @id @default(autoincrement())
+  formularioId Int
+  formulario   Formulario @relation(fields: [formularioId], references: [id])
+  usuarioId    String
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
+  puedeVer     Boolean  @default(true)
+  puedeEditar  Boolean  @default(false)
+
+  @@unique([formularioId, usuarioId])
+}

@@ -1,7 +1,7 @@
 # CLAUDE.md — Sistema de Inspección en Terreno (ALCOP)
 
 > Documento vivo. Actualizar con cada decisión técnica relevante.
-> Última actualización: Octubre 2026 · Versión 0.1 (post luz verde, Etapa 1 + Etapa 2)
+> Última actualización: 04-10-2026 · Versión 0.1 (post luz verde, Etapa 1 + Etapa 2 · scaffold montado)
 
 ---
 
@@ -26,17 +26,15 @@
 
 ### Decisión canónica — Base del frontend (alcop-web)
 
-Template base: next-shadcn-dashboard-starter (Kiranism) — el mismo que en FAS.
-Stack alineado: Next.js 15 App Router, React 19, Tailwind v4, shadcn/ui.
-Se adopta como ESQUELETO, no como aplicación final: se forkea y se adapta.
+Stack real del scaffold (04-10-2026): **Next.js 16 App Router (Turbopack), React 19, Tailwind v4, shadcn/ui sobre Base UI**. Se montó con `create-next-app@latest` + `shadcn@latest` directamente — **no** se forkeó el template next-shadcn-dashboard-starter (Kiranism) de FAS; de ahí solo se toman ideas de layout, no el código. El downgrade a Next 15 / Radix se descartó a conciencia (ver §3 y §11).
 
 Reglas de adaptación (obligatorias):
-1. AUTH: arrancar Clerk por completo (rutas, middleware, providers) y reemplazar por Better Auth contra alcop-api.
-2. DATA FETCHING: NO usar la capa de fetching propia del template. Usar TanStack Query + ky contra alcop-api.
-3. NAVEGACIÓN: sidebar construido desde ItemMenu + perfiles, respetando niveles LECTURA / TOTAL — con la regla de visibilidad de la sección 05 de `alcop-esquema.html` (usuario con ambos perfiles ve Prevención + Técnica; usuario de un área ve solo la suya).
-4. Quitar módulos no usados del template (kanban, e-commerce, etc.).
+1. AUTH: Better Auth contra alcop-api (hoy el login es placeholder; `lib/auth-client.ts` es stub hasta cablear el backend).
+2. DATA FETCHING: TanStack Query + ky contra alcop-api (ver `lib/api.ts`). No introducir otra capa de fetching.
+3. NAVEGACIÓN: sidebar construido desde los **niveles por área del Perfil** (`nivelPrevencion`/`nivelTecnica` vía `GET /api/usuarios/me`), respetando LECTURA / TOTAL y la regla de visibilidad de la sección 05 de `alcop-esquema.html` (usuario con ambas áreas ve Prevención + Técnica; usuario de un área ve solo la suya). **No hay ItemMenu ni endpoint `/menu`** — ALCOP usa nivel por Área, no ítems de menú (ver §11 y `Docs/usuarios-perfiles.md`). Hoy el sidebar es estático con las secciones canónicas; el filtrado por nivel se cablea al integrar auth.
+4. Mantener el proyecto limpio: sin módulos de demo (kanban, e-commerce, etc.).
 
-Se conserva del template: TanStack Tables server-side (search/filter/paginación), formularios React Hook Form + Zod, theming por CSS variables (remarcar a identidad ALCOP).
+Convenciones conservadas: tablas server-side (search/filter/paginación) con TanStack, formularios React Hook Form + Zod, theming por CSS variables (remarcar a identidad ALCOP).
 
 ### Decisión canónica — Análisis IA
 
@@ -100,14 +98,16 @@ Mismo stack que FAS (consistencia de portafolio VIAIN) — se reutilizan Docker 
 ### alcop-web (Frontend)
 | Capa | Tecnología | Versión |
 |------|-----------|---------|
-| Framework | Next.js | 15 (App Router) |
+| Framework | Next.js | 16 (App Router, Turbopack) |
 | Lenguaje | TypeScript | 5.x |
 | UI base | React | 19 |
 | Estilos | Tailwind CSS | v4 |
-| Componentes | shadcn/ui | latest |
+| Componentes | shadcn/ui (estilo base-nova, sobre **Base UI** `@base-ui/react`) | latest |
 | Estado servidor | TanStack Query | v5 |
 | Formularios | React Hook Form + Zod | latest |
-| HTTP client | ky | latest |
+| HTTP client | ky | **v1.x** (fijado — ky v2 cambia la API de hooks) |
+
+> **Nota (04-10-2026):** el scaffold real quedó en **Next.js 16** y shadcn sobre **Base UI** (no Radix), no en Next 15 — ver la decisión canónica de abajo. `create-next-app@latest` ya entrega Next 16 y el shadcn CLI por defecto usa el estilo `base-nova` (Base UI). Se adoptó el stack nuevo en vez de forzar el downgrade; diverge del template Kiranism/FAS (Radix/Next 15) a conciencia.
 
 ### Infraestructura
 - **Contenedores:** Docker + Docker Compose (ver `docker-compose.yml` — puertos distintos a FAS para correr ambos stacks en paralelo en la misma máquina: Postgres 5434, Redis 6380, pgAdmin 5051, Redis Commander 8082, API 3011, Web 3010)
@@ -326,6 +326,7 @@ Ver `docker-compose.yml` en la raíz del proyecto (PostgreSQL 17, Redis 7, pgAdm
 - Formularios 100% dinámicos desde la Etapa 1 (no hay formularios hardcodeados en código): tipos de respuesta Checkbox, Selección múltiple, Número, Texto, Texto largo; foto opcional por pregunta; permisos de ver/editar por usuario además del nivel de área.
 - Definición técnica de la Etapa 2 (App móvil) puesta en stand by el 04-10-2026 — foco 100% en Etapa 1 por ahora.
 - Reglas de acceso y permisos cerradas el 04-10-2026: "Jefe Prevencionista" queda `SIN_ACCESO` en Técnica (difiere de la redacción "ambas" de alcop-esquema.html §08); `FormularioPermiso` solo amplía acceso, nunca lo niega; `CategoriaFormulario` es 100% dinámico, sin lista cerrada previa.
+- **Scaffold montado el 04-10-2026** (`alcop-api` + `alcop-web`). Decisión de stack frontend: se adopta **Next.js 16 + shadcn sobre Base UI** (lo que entrega `create-next-app@latest`/`shadcn@latest` hoy) en vez de forzar el downgrade a Next 15 / Radix del contrato original — diverge del template Kiranism/FAS a conciencia. `ky` fijado a v1.x. Backend fijado al contrato: **Prisma 5.x, Zod 3.x, TypeScript 5.x** (se bajaron desde las latest 7/4/7 que traía `npm install`). `dotenv` agregado al backend solo para cargar `.env` en desarrollo local (en Docker/prod la env la inyecta el entorno).
 
 ---
 
