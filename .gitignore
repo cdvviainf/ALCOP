@@ -1,5 +1,6 @@
 # Env files con valores reales — NUNCA subir al repo
 .env.demo
+.env.qa
 .env
 
 # OS

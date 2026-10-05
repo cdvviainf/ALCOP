@@ -1,0 +1,124 @@
+################################################################################
+# docker-compose.qa.yml — ALCOP QA / Demo (Coolify)
+#
+# Mirror del patrón ya probado en ENE (Build strategy = Compose). Ver la guía
+# completa en DEPLOY-COOLIFY.md.
+#
+# Para Coolify:
+#   1. Crear recurso "Docker Compose" (Build strategy = Compose) apuntando a
+#      este archivo: Docker compose location = /docker-compose.qa.yml,
+#      Base directory = /.
+#   2. Cargar las variables de entorno en la UI de Coolify (ver .env.qa.example).
+#   3. En "Domains" de los servicios `api` y `web` asignar el subdominio
+#      autogenerado por Coolify. Coolify gestiona el SSL (Let's Encrypt).
+#
+# Build args del build de alcop-web (se EMBEBEN en el bundle del navegador —
+# se fijan al construir, no en runtime):
+#   NEXT_PUBLIC_API_URL → URL pública de la API + /api, ej:
+#     https://<subdominio-api>.<coolify-host>/api
+#   NEXT_PUBLIC_APP_URL → URL pública del propio frontend (la usará el cliente
+#     de Better Auth cuando se cablee el login).
+#
+# DIFERENCIA DELIBERADA vs ENE: acá api/web NO bindean puertos de host (usan
+# `expose`), para que ALCOP conviva con ENE en el mismo servidor Coolify sin
+# chocar en 3010/3011. Coolify enruta por dominio al puerto EXPOSE del
+# contenedor (api 3001, web 3000).
+################################################################################
+
+services:
+
+  # ─── PostgreSQL 17 ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: alcop_qa_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    # Exposición del puerto de la BD a Internet: OPCIONAL, solo para
+    # administración remota (pgAdmin), como en ENE. Comentado por defecto.
+    # Si se habilita, rotar DB_PASSWORD al terminar. Puerto 5434 para no chocar
+    # con ENE (5433) si comparten servidor.
+    # ports:
+    #   - "5434:5432"
+    volumes:
+      - alcop_qa_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis 7 ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: alcop_qa_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - alcop_qa_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── API (alcop-api) ──────────────────────────────────────────────────────────
+  # El CMD del Dockerfile corre `prisma migrate deploy` antes de arrancar, así
+  # que las migraciones se aplican solas en cada deploy. El SEED (áreas,
+  # perfiles, categorías) NO corre automáticamente — ver DEPLOY-COOLIFY.md.
+  api:
+    build:
+      context: ./alcop-api
+      dockerfile: Dockerfile
+    container_name: alcop_qa_api
+    restart: unless-stopped
+    expose:
+      - "3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      TZ: America/Santiago
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${API_PUBLIC_URL}
+      CORS_ORIGIN: ${WEB_PUBLIC_URL}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@alcop.cl}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      AI_API_KEY: ${AI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── Web (alcop-web) ───────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./alcop-web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_URL: ${WEB_PUBLIC_URL}
+    container_name: alcop_qa_web
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      # Server-side (sin prefijo NEXT_PUBLIC_): para cuando el web llame a la API
+      # por la red interna de Docker. Hoy el scaffold llama desde el navegador
+      # (lib/api.ts); se deja listo para forward-compat.
+      INTERNAL_API_URL: http://api:3001
+    depends_on:
+      - api
+
+volumes:
+  alcop_qa_postgres_data:
+    driver: local
+  alcop_qa_redis_data:
+    driver: local
