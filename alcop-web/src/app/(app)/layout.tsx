@@ -1,6 +1,4 @@
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/app-sidebar'
-import { TopBar } from '@/components/layout/top-bar'
 
 export default function AppLayout({
   children,
@@ -8,12 +6,9 @@ export default function AppLayout({
   children: React.ReactNode
 }) {
   return (
-    <SidebarProvider>
+    <div className="flex min-h-svh bg-content">
       <AppSidebar />
-      <SidebarInset>
-        <TopBar />
-        <main className="flex-1 space-y-6 p-6">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+    </div>
   )
 }
