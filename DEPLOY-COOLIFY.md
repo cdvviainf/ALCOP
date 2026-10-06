@@ -37,15 +37,16 @@ dominio al puerto EXPOSE (api 3001, web 3000).
 - **Migraciones:** automáticas. El `CMD` del Dockerfile de `alcop-api` corre
   `npx prisma migrate deploy` antes de arrancar, en cada deploy. Las migraciones
   (`prisma/migrations/`) están commiteadas.
-- **Seed (áreas, perfiles, categorías):** **NO corre automáticamente**, y OJO:
-  el seed actual (`prisma/seed.ts`) usa `tsx`, que es `devDependency` y **no está
-  en la imagen de producción** (`--omit=dev`). Por lo tanto `npm run db:seed` no
-  funciona dentro del contenedor de prod tal cual.
-  - Para el primer demo no es bloqueante: el login aún es placeholder (Better
-    Auth sin cablear), así que todavía no hay nada que loguear.
-  - Cuando se necesite seedear en QA, la opción limpia es mover el seed a `src/`
-    para que `tsc` lo compile a `dist/` y encadenarlo en el arranque, o correrlo
-    una vez vía **Coolify → Terminal**. (Pendiente — ver §11 de `CLAUDE.md`.)
+- **Seed (áreas, perfiles, categorías, obras, admin):** corre **automáticamente**
+  en cada arranque. El `CMD` del Dockerfile encadena
+  `migrate deploy && node dist/scripts/seed.js && server`. El seed es idempotente.
+- **Admin (IMPORTANTE — seguridad):** el seed solo crea/rota el administrador si
+  la variable **`SEED_ADMIN_PASSWORD`** está definida (no hay contraseña por
+  defecto en el repo). Setearla en la UI de Coolify con un valor fuerte (≥8).
+  - Cambiar `SEED_ADMIN_PASSWORD` y redeployar **rota** la contraseña del admin
+    existente de forma idempotente (no hace falta tocar la BD).
+  - `SEED_ADMIN_EMAIL` por defecto es `admin@alcop.cl`.
+  - Sin `SEED_ADMIN_PASSWORD`, no se podrá iniciar sesión (no se siembra admin).
 
 ## 5. Qué esperar de este primer demo
 

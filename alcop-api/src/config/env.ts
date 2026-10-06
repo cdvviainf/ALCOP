@@ -13,6 +13,10 @@ const envSchema = z.object({
   AI_PROVIDER: z.enum(['mock', 'gemini']).default('mock'),
   AI_API_KEY: z.string().optional(),
   CORS_ORIGIN: z.string().default('http://localhost:3010'),
+  // Seed del administrador (src/scripts/seed.ts). SIN default: si no se define,
+  // el seed NO crea/rotа el admin (evita credenciales por defecto en el repo).
+  SEED_ADMIN_EMAIL: z.string().email().default('admin@alcop.cl'),
+  SEED_ADMIN_PASSWORD: z.string().min(8).optional(),
   // Motor de Documentos (PDF) — Playwright / Chromium del sistema (ver Dockerfile).
   PLAYWRIGHT_EXECUTABLE_PATH: z.string().optional(),
 })

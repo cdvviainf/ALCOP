@@ -56,7 +56,13 @@ export default function LoginPage() {
       typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('from')
         : null
-    router.push(from && from.startsWith('/') ? from : '/obras')
+    // Solo rutas locales same-origin: `//evil.com` o `/\evil.com` son redirect
+    // abierto (el browser los resuelve como cross-origin) — se descartan.
+    const destino =
+      from && from.startsWith('/') && !from.startsWith('//') && !from.startsWith('/\\')
+        ? from
+        : '/obras'
+    router.push(destino)
     router.refresh()
   }
 

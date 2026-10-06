@@ -2,10 +2,13 @@ import 'dotenv/config' // carga .env para DATABASE_URL / BETTER_AUTH_* al correr
 import { NivelAcceso } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { auth } from '../lib/auth.js'
+import { env } from '../config/env.js'
 
-// Credenciales demo del administrador sembrado (idempotente).
-const ADMIN_EMAIL = 'admin@alcop.cl'
-const ADMIN_PASSWORD = 'Alcop.Demo2026'
+// El administrador se siembra con credenciales desde el entorno (SEED_ADMIN_*).
+// NO hay password por defecto en el repo: si SEED_ADMIN_PASSWORD no está
+// definido, seedAdmin() se omite (evita credenciales conocidas comprometidas).
+const ADMIN_EMAIL = env.SEED_ADMIN_EMAIL
+const ADMIN_PASSWORD = env.SEED_ADMIN_PASSWORD
 const ADMIN_NOMBRE = 'Administrador ALCOP'
 
 /** Slug en MAYÚSCULAS para `codigo` (p.ej. "Seguridad General" -> "SEGURIDAD_GENERAL"). */
@@ -113,37 +116,44 @@ async function seedObras() {
 }
 
 async function seedAdmin() {
+  if (!ADMIN_PASSWORD) {
+    console.warn('⚠️  SEED_ADMIN_PASSWORD no definido — se omite la creación/rotación del admin.')
+    return
+  }
+
   // Perfil Administrador (ya sembrado por seedPerfiles).
   const perfil = await prisma.perfil.findFirst({ where: { nombre: 'Administrador', eliminadoEn: null } })
   if (!perfil) throw new Error('No existe el perfil "Administrador". Revisa seedPerfiles.')
 
-  // Idempotencia: si el Usuario de dominio ya existe, no duplicar.
-  const usuarioExistente = await prisma.usuario.findUnique({ where: { email: ADMIN_EMAIL } })
-  if (usuarioExistente?.authUserId) {
-    console.log(`ℹ️  Usuario admin ya existe (${ADMIN_EMAIL}). Nada que hacer.`)
-    return
-  }
-
-  // Crear la identidad en Better Auth si no existe (hashea la credencial y crea
-  // auth_user + auth_account). El hook session.create bloquea la auto-sesión
-  // porque aún no hay Usuario de dominio enlazado — es esperado; igual se crean
-  // auth_user/auth_account, que es lo que necesitamos.
+  // 1) Identidad Better Auth (auth_user + auth_account credential).
   let authUser = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } })
   if (!authUser) {
     try {
+      // signUpEmail hashea la credencial y crea auth_user + auth_account. El hook
+      // session.create bloquea la auto-sesión (aún no hay Usuario de dominio); es
+      // esperado y no impide la creación de la identidad.
       await auth.api.signUpEmail({
         body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, name: ADMIN_NOMBRE },
       })
     } catch (err) {
-      // El bloqueo de la auto-sesión (hook) puede propagarse como error aun
-      // habiendo creado auth_user/auth_account. Se reintenta la búsqueda abajo.
       console.warn('⚠️  signUpEmail lanzó (posible bloqueo de auto-sesión, esperado):', (err as Error).message)
     }
     authUser = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } })
     if (!authUser) throw new Error('No se pudo crear la identidad Better Auth del admin.')
+  } else {
+    // 2) Rotación idempotente: fija la credencial a SEED_ADMIN_PASSWORD actual,
+    //    de modo que cambiar la variable y redesplegar rote la contraseña del
+    //    admin sin tocar la BD a mano.
+    const ctx = await auth.$context
+    const hash = await ctx.password.hash(ADMIN_PASSWORD)
+    await prisma.account.updateMany({
+      where: { userId: authUser.id, providerId: 'credential' },
+      data: { password: hash },
+    })
   }
 
-  // Crear/enlazar el Usuario de dominio.
+  // 3) Crear/enlazar el Usuario de dominio.
+  const usuarioExistente = await prisma.usuario.findUnique({ where: { email: ADMIN_EMAIL } })
   if (usuarioExistente) {
     await prisma.usuario.update({
       where: { id: usuarioExistente.id },
@@ -161,6 +171,7 @@ async function seedAdmin() {
       },
     })
   }
+  console.log(`🔑 Admin listo: ${ADMIN_EMAIL} (contraseña desde SEED_ADMIN_PASSWORD).`)
 }
 
 async function main() {
@@ -168,11 +179,14 @@ async function main() {
   await seedPerfiles()
   await seedCategorias(prevencion.id, tecnica.id)
   await seedObras()
-  await seedAdmin()
-  console.log('✅ Seed completado: 2 Areas, 6 Perfiles, 11 Categorías, 4 Obras, 1 Admin.')
-  console.log('🔑 Credenciales demo admin:')
-  console.log(`   email:    ${ADMIN_EMAIL}`)
-  console.log(`   password: ${ADMIN_PASSWORD}`)
+  // El seed del admin es best-effort: un fallo acá NO debe abortar el arranque
+  // del contenedor (el CMD encadena `seed && server`).
+  try {
+    await seedAdmin()
+  } catch (err) {
+    console.warn('⚠️  Seed de admin falló (no bloquea el arranque):', (err as Error).message)
+  }
+  console.log('✅ Seed completado: 2 Areas, 6 Perfiles, 11 Categorías, 4 Obras.')
 }
 
 main()

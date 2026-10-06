@@ -90,6 +90,10 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       AI_API_KEY: ${AI_API_KEY:-}
+      # Admin sembrado por el CMD del Dockerfile. Sin SEED_ADMIN_PASSWORD el seed
+      # NO crea/rota el admin. Cambiar la var + redeploy rota la contraseña.
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@alcop.cl}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
