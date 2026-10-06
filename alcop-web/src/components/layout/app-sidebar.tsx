@@ -2,23 +2,28 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  House,
-  ClipboardCheck,
-  Flag,
-  BarChart,
-  Folder,
-  Users,
-  ShieldAlert,
-  ListChecks,
-  Layers,
-  Boxes,
-  FolderTree,
-  IdCard,
-  Link2,
   ArrowUp,
+  Boxes,
+  Building2,
+  ChevronRight,
+  ClipboardCheck,
+  Database,
+  FolderTree,
+  Gauge,
+  HardHat,
+  IdCard,
+  LayoutDashboard,
+  Layers,
+  Link2,
+  ListChecks,
   LogOut,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
+  Wrench,
 } from 'lucide-react'
 
 import { cn } from 'cn'
@@ -32,59 +37,129 @@ interface Me {
   perfil: { id: number; nombre: string; nivelPrevencion: string; nivelTecnica: string }
 }
 
+/**
+ * Sidebar oscuro de ALCOP TERRENO, en secciones con grupos anidados colapsables.
+ *
+ * Visibilidad por Área (CLAUDE.md §11, usuarios-perfiles.md §6, alcop-esquema.html §05):
+ * cada hoja declara `requiere` y se filtra según los niveles del perfil del usuario
+ * (GET /api/usuarios/me). Un grupo/sección se muestra si tiene al menos una hoja visible.
+ * Mientras `/me` no resuelve no se muestra ningún item.
+ *   - 'nucleo'   → ≥ LECTURA en al menos un área.
+ *   - 'prevencion'/'tecnica' → nivel del área ≠ SIN_ACCESO.
+ *   - 'anyTotal' → TOTAL en al menos un área.
+ *   - 'admin'    → TOTAL en ambas áreas.
+ */
+
+type Requisito = 'nucleo' | 'prevencion' | 'tecnica' | 'anyTotal' | 'admin'
+type Icono = React.ComponentType<{ className?: string }>
+
+interface Hoja {
+  title: string
+  href: string
+  icon: Icono
+  requiere: Requisito
+}
+interface Grupo {
+  title: string
+  icon: Icono
+  children: Nodo[]
+}
+type Nodo = Hoja | Grupo
+
+interface Seccion {
+  seccion: string
+  items: Nodo[]
+}
+
+function esHoja(n: Nodo): n is Hoja {
+  return 'href' in n
+}
+
+const NAV: Seccion[] = [
+  {
+    seccion: 'Inicio',
+    items: [{ title: 'Dashboard', href: '/', icon: LayoutDashboard, requiere: 'nucleo' }],
+  },
+  {
+    seccion: 'Registro',
+    items: [
+      { title: 'Inspección Técnica', href: '/registro/inspeccion-tecnica', icon: HardHat, requiere: 'tecnica' },
+      { title: 'Inspección Prevención', href: '/registro/inspeccion-prevencion', icon: ShieldCheck, requiere: 'prevencion' },
+    ],
+  },
+  {
+    seccion: 'Configuración',
+    items: [
+      { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: 'nucleo' },
+      {
+        title: 'Datos Maestros',
+        icon: Database,
+        children: [
+          {
+            title: 'Técnicos',
+            icon: Wrench,
+            children: [
+              { title: 'Categorías', href: '/formularios/categorias/tecnica', icon: FolderTree, requiere: 'tecnica' },
+              { title: 'Tipos Hallazgo', href: '/tecnica/tipos-hallazgo', icon: ListChecks, requiere: 'tecnica' },
+              { title: 'Etapas Constructivas', href: '/tecnica/etapas-constructivas', icon: Layers, requiere: 'tecnica' },
+              { title: 'Etapas de Nido', href: '/tecnica/etapas-nido', icon: Boxes, requiere: 'tecnica' },
+            ],
+          },
+          {
+            title: 'Prevención',
+            icon: ShieldAlert,
+            children: [
+              { title: 'Categorías', href: '/formularios/categorias/prevencion', icon: FolderTree, requiere: 'prevencion' },
+              { title: 'Nivel de Riesgo', href: '/prevencion/niveles-riesgo', icon: Gauge, requiere: 'prevencion' },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    seccion: 'Accesos',
+    items: [
+      { title: 'Usuarios', href: '/usuarios', icon: Users, requiere: 'admin' },
+      { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard, requiere: 'admin' },
+      { title: 'Obras', href: '/obras', icon: Building2, requiere: 'anyTotal' },
+      { title: 'Asignaciones', href: '/usuarios/asignaciones', icon: Link2, requiere: 'admin' },
+    ],
+  },
+]
+
 function iniciales(nombre: string): string {
   const partes = nombre.trim().split(/\s+/)
   return ((partes[0]?.[0] ?? '') + (partes[1]?.[0] ?? '')).toUpperCase() || '—'
 }
 
-/**
- * Sidebar oscuro fijo de ALCOP TERRENO (réplica del mockup web-02/03).
- *
- * Visibilidad por Área (CLAUDE.md §11, Docs/usuarios-perfiles.md §6,
- * alcop-esquema.html §05): cada item declara qué requiere y se filtra según los
- * niveles del perfil del usuario (nivelPrevencion / nivelTecnica desde
- * GET /api/usuarios/me):
- *   - 'nucleo'     → ≥ LECTURA en al menos un área (núcleo compartido).
- *   - 'prevencion' → nivelPrevencion ≠ SIN_ACCESO.
- *   - 'tecnica'    → nivelTecnica ≠ SIN_ACCESO.
- *   - 'admin'      → Administrador (TOTAL en ambas áreas) — config de núcleo.
- *
- * Mientras `/me` no resuelve no se muestra ningún item (evita destello de menú).
- */
-
-type Requisito = 'nucleo' | 'prevencion' | 'tecnica' | 'admin'
-
-interface NavItem {
-  title: string
-  href: string
-  icon: React.ComponentType<{ className?: string }>
-  requiere: Requisito
+function cumpleNivel(req: Requisito, me: Me | undefined): boolean {
+  if (!me) return false
+  const p = me.perfil.nivelPrevencion
+  const t = me.perfil.nivelTecnica
+  switch (req) {
+    case 'nucleo':
+      return p !== 'SIN_ACCESO' || t !== 'SIN_ACCESO'
+    case 'prevencion':
+      return p !== 'SIN_ACCESO'
+    case 'tecnica':
+      return t !== 'SIN_ACCESO'
+    case 'anyTotal':
+      return p === 'TOTAL' || t === 'TOTAL'
+    case 'admin':
+      return p === 'TOTAL' && t === 'TOTAL'
+  }
 }
 
-const NAV: NavItem[] = [
-  { title: 'Obras', href: '/obras', icon: House, requiere: 'nucleo' },
-  { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: 'nucleo' },
-  { title: 'Categorías', href: '/formularios/categorias', icon: FolderTree, requiere: 'nucleo' },
-  { title: 'Hallazgos', href: '/hallazgos', icon: Flag, requiere: 'prevencion' },
-  { title: 'Niveles de riesgo', href: '/prevencion/niveles-riesgo', icon: ShieldAlert, requiere: 'prevencion' },
-  { title: 'Tipos de hallazgo', href: '/tecnica/tipos-hallazgo', icon: ListChecks, requiere: 'tecnica' },
-  { title: 'Etapas constructivas', href: '/tecnica/etapas-constructivas', icon: Layers, requiere: 'tecnica' },
-  { title: 'Etapas de nido', href: '/tecnica/etapas-nido', icon: Boxes, requiere: 'tecnica' },
-  { title: 'Analítica', href: '/analitica', icon: BarChart, requiere: 'nucleo' },
-  { title: 'Biblioteca', href: '/biblioteca', icon: Folder, requiere: 'nucleo' },
-  { title: 'Usuarios', href: '/usuarios', icon: Users, requiere: 'admin' },
-  { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard, requiere: 'admin' },
-  { title: 'Asignaciones', href: '/usuarios/asignaciones', icon: Link2, requiere: 'admin' },
-]
+function nodoVisible(n: Nodo, me: Me | undefined): boolean {
+  return esHoja(n) ? cumpleNivel(n.requiere, me) : n.children.some((c) => nodoVisible(c, me))
+}
 
-/** ¿El usuario (con sus niveles por área) puede ver este item? Sin `/me`, nada. */
-function puedeVer(requiere: Requisito, me: Me | undefined): boolean {
-  if (!me) return false // hasta resolver /me no se muestra ningún item (FAD-001)
-  const { nivelPrevencion, nivelTecnica } = me.perfil
-  if (requiere === 'nucleo') return nivelPrevencion !== 'SIN_ACCESO' || nivelTecnica !== 'SIN_ACCESO'
-  if (requiere === 'prevencion') return nivelPrevencion !== 'SIN_ACCESO'
-  if (requiere === 'tecnica') return nivelTecnica !== 'SIN_ACCESO'
-  return nivelPrevencion === 'TOTAL' && nivelTecnica === 'TOTAL' // admin
+/** Todas las hrefs visibles, para elegir el prefijo activo más específico. */
+function hrefsVisibles(items: Nodo[], me: Me | undefined): string[] {
+  return items.flatMap((n) =>
+    esHoja(n) ? (cumpleNivel(n.requiere, me) ? [n.href] : []) : hrefsVisibles(n.children, me)
+  )
 }
 
 export function AppSidebar() {
@@ -95,11 +170,75 @@ export function AppSidebar() {
     queryFn: () => api.get('usuarios/me').json<Me>(),
     retry: false,
   })
+  const [colapsados, setColapsados] = useState<Set<string>>(new Set())
 
   const handleLogout = async () => {
     await authClient.signOut()
     router.push('/login')
     router.refresh()
+  }
+
+  // Href visible cuyo prefijo calza mejor con la ruta actual → único activo.
+  const todas = hrefsVisibles(
+    NAV.flatMap((s) => s.items),
+    me
+  )
+  const activo = todas
+    .filter((h) => pathname === h || pathname.startsWith(h + '/'))
+    .sort((a, b) => b.length - a.length)[0]
+
+  const toggle = (key: string) =>
+    setColapsados((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+
+  function renderNodo(n: Nodo, level: number): React.ReactNode {
+    if (!nodoVisible(n, me)) return null
+    const padding = { paddingLeft: `${0.875 + level * 0.85}rem` }
+
+    if (esHoja(n)) {
+      const isActive = n.href === activo
+      return (
+        <li key={n.href}>
+          <Link
+            href={n.href}
+            style={padding}
+            className={cn(
+              'relative flex items-center gap-3 rounded-lg py-2.5 pr-3.5 text-sm transition-colors',
+              isActive
+                ? 'bg-panel-active font-semibold text-white'
+                : 'text-panel-item hover:bg-white/5 hover:text-white'
+            )}
+          >
+            {isActive ? (
+              <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
+            ) : null}
+            <n.icon className={cn('size-[18px]', isActive ? 'text-white' : 'text-panel-muted')} />
+            <span>{n.title}</span>
+          </Link>
+        </li>
+      )
+    }
+
+    const abierto = !colapsados.has(n.title)
+    return (
+      <li key={n.title}>
+        <button
+          type="button"
+          onClick={() => toggle(n.title)}
+          style={padding}
+          className="flex w-full items-center gap-3 rounded-lg py-2.5 pr-3 text-sm text-panel-item transition-colors hover:bg-white/5 hover:text-white"
+        >
+          <n.icon className="size-[18px] text-panel-muted" />
+          <span className="flex-1 text-left">{n.title}</span>
+          <ChevronRight className={cn('size-4 text-panel-muted transition-transform', abierto && 'rotate-90')} />
+        </button>
+        {abierto ? <ul className="mt-1 space-y-1">{n.children.map((c) => renderNodo(c, level + 1))}</ul> : null}
+      </li>
+    )
   }
 
   return (
@@ -109,52 +248,22 @@ export function AppSidebar() {
         <span className="flex items-center justify-center rounded-md border-2 border-primary p-1">
           <ArrowUp className="size-4 text-primary" strokeWidth={2.5} />
         </span>
-        <span className="text-sm font-bold tracking-wide text-white">
-          ALCOP TERRENO
-        </span>
+        <span className="text-sm font-bold tracking-wide text-white">ALCOP TERRENO</span>
       </div>
 
-      {/* Navegación */}
-      <nav className="mt-2 flex-1 px-3">
-        <ul className="space-y-1">
-          {(() => {
-            // Filtra por nivel de Área del perfil (visibilidad del sidebar).
-            const visibles = NAV.filter((i) => puedeVer(i.requiere, me))
-            // El prefijo coincidente más específico es el único activo (evita que
-            // "Usuarios" y "Perfiles" se marquen a la vez).
-            const activo = visibles
-              .map((i) => i.href)
-              .filter((h) => pathname === h || pathname.startsWith(h + '/'))
-              .sort((a, b) => b.length - a.length)[0]
-            return visibles.map((item) => {
-            const isActive = item.href === activo
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'relative flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm transition-colors',
-                    isActive
-                      ? 'bg-panel-active font-semibold text-white'
-                      : 'text-panel-item hover:bg-white/5 hover:text-white'
-                  )}
-                >
-                  {isActive ? (
-                    <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
-                  ) : null}
-                  <item.icon
-                    className={cn(
-                      'size-[18px]',
-                      isActive ? 'text-white' : 'text-panel-muted'
-                    )}
-                  />
-                  <span>{item.title}</span>
-                </Link>
-              </li>
-            )
-            })
-          })()}
-        </ul>
+      {/* Navegación por secciones */}
+      <nav className="mt-1 flex-1 overflow-y-auto px-3 pb-4">
+        {NAV.map((sec) => {
+          if (!sec.items.some((n) => nodoVisible(n, me))) return null
+          return (
+            <div key={sec.seccion} className="mt-4 first:mt-0">
+              <p className="px-3.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-panel-muted">
+                {sec.seccion}
+              </p>
+              <ul className="space-y-1">{sec.items.map((n) => renderNodo(n, 0))}</ul>
+            </div>
+          )
+        })}
       </nav>
 
       {/* Usuario */}
@@ -165,12 +274,8 @@ export function AppSidebar() {
             {me ? iniciales(me.nombre) : '…'}
           </span>
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-sm font-semibold text-white">
-              {me?.nombre ?? '—'}
-            </div>
-            <div className="truncate text-xs text-panel-muted">
-              {me?.perfil.nombre ?? ''}
-            </div>
+            <div className="truncate text-sm font-semibold text-white">{me?.nombre ?? '—'}</div>
+            <div className="truncate text-xs text-panel-muted">{me?.perfil.nombre ?? ''}</div>
           </div>
           <button
             type="button"

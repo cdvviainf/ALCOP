@@ -99,6 +99,8 @@ export interface CrudMaintainerProps<T extends { id: string | number }, TForm ex
   emptyMessage?: string
   searchPlaceholder?: string
   limit?: number
+  /** Filtros fijos extra para el listado (se mergean en los searchParams, p. ej. areaId). */
+  extraParams?: Record<string, string>
 }
 
 type DialogState<T> = { mode: 'crear' } | { mode: 'editar'; row: T } | null
@@ -119,6 +121,7 @@ export function CrudMaintainer<T extends { id: string | number }, TForm extends 
   emptyMessage = 'Sin registros.',
   searchPlaceholder = 'Buscar…',
   limit = 20,
+  extraParams,
 }: CrudMaintainerProps<T, TForm>) {
   // Edición por fila; "Nuevo" según puedeCrear (default = puedeEditar si es booleano).
   const editableGeneral = puedeEditar !== false
@@ -141,7 +144,7 @@ export function CrudMaintainer<T extends { id: string | number }, TForm extends 
     return () => clearTimeout(t)
   }, [q])
 
-  const listQueryKey = [queryKey, { q: qDebounced, page, limit }] as const
+  const listQueryKey = [queryKey, { q: qDebounced, page, limit, extraParams }] as const
 
   const { data, isLoading, isError } = useQuery({
     queryKey: listQueryKey,
@@ -152,6 +155,7 @@ export function CrudMaintainer<T extends { id: string | number }, TForm extends 
             page: String(page),
             limit: String(limit),
             ...(qDebounced ? { q: qDebounced } : {}),
+            ...(extraParams ?? {}),
           },
         })
         .json<Paginated<T>>(),
