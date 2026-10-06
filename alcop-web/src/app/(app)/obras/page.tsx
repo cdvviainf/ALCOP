@@ -1,46 +1,60 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Loader2 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 
 import { cn } from 'cn'
+import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/top-bar'
 
 interface Obra {
+  id: number
   nombre: string
-  comuna: string
-  ultimaVisita: string
-  estado: 'AL DÍA' | 'PENDIENTE'
+  comuna: string | null
+  direccion: string | null
+  activo: boolean
+  fechaInicio: string | null
+  creadoEn: string
 }
 
-const STATS = [
-  { label: 'OBRAS ACTIVAS', value: '6', accent: false },
-  { label: 'VISITAS ESTA SEMANA', value: '17', accent: false },
-  { label: 'PENDIENTES', value: '1', accent: true },
-]
+interface ObrasResponse {
+  data: Obra[]
+  meta: { total: number; page: number; limit: number; totalPages: number }
+}
 
-const OBRAS: Obra[] = [
-  { nombre: 'Condominio Mirador Piedra Roja', comuna: 'Chicureo', ultimaVisita: 'Hoy', estado: 'AL DÍA' },
-  { nombre: 'Condominio Chamisero III', comuna: '—', ultimaVisita: 'Hace 6 días', estado: 'PENDIENTE' },
-  { nombre: 'Condominio Casas Olmo', comuna: '—', ultimaVisita: 'Ayer', estado: 'AL DÍA' },
-  { nombre: 'Condominio Mirador del Alto', comuna: 'San Esteban', ultimaVisita: 'Hace 2 días', estado: 'AL DÍA' },
-]
-
-function EstadoBadge({ estado }: { estado: Obra['estado'] }) {
-  const esAlDia = estado === 'AL DÍA'
+function EstadoBadge({ activa }: { activa: boolean }) {
+  // Placeholder: el estado real (AL DÍA / PENDIENTE) vendrá del módulo de
+  // visitas (pendiente de spec en tecnica.md / prevencion.md). Por ahora toda
+  // obra activa se muestra "AL DÍA".
   return (
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
-        esAlDia ? 'bg-ok-bg text-ok-fg' : 'bg-warn-bg text-warn-fg'
+        activa ? 'bg-ok-bg text-ok-fg' : 'bg-warn-bg text-warn-fg'
       )}
     >
-      {estado}
+      {activa ? 'AL DÍA' : 'INACTIVA'}
     </span>
   )
 }
 
 export default function ObrasPage() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['obras'],
+    queryFn: () => api.get('nucleo/obras').json<ObrasResponse>(),
+  })
+
+  const obras = data?.data ?? []
+  const activas = obras.filter((o) => o.activo).length
+
+  const stats = [
+    { label: 'OBRAS ACTIVAS', value: String(activas), accent: false },
+    // Placeholders hasta el módulo de visitas (sin spec aún).
+    { label: 'VISITAS ESTA SEMANA', value: '—', accent: false },
+    { label: 'PENDIENTES', value: '—', accent: true },
+  ]
+
   return (
     <>
       <TopBar />
@@ -49,7 +63,7 @@ export default function ObrasPage() {
 
         {/* Stat cards */}
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {STATS.map((stat) => (
+          {stats.map((stat) => (
             <div
               key={stat.label}
               className="rounded-xl border border-border bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
@@ -78,24 +92,41 @@ export default function ObrasPage() {
             <span>ESTADO</span>
             <span />
           </div>
-          {OBRAS.map((obra, i) => (
-            <Link
-              key={obra.nombre}
-              href="/formularios/epp"
-              className={cn(
-                'grid grid-cols-[2.4fr_1.2fr_1.2fr_1fr_40px] items-center gap-4 px-6 py-5 text-sm transition-colors hover:bg-secondary',
-                i !== OBRAS.length - 1 && 'border-b border-border'
-              )}
-            >
-              <span className="font-bold text-foreground">{obra.nombre}</span>
-              <span className="text-muted-foreground">{obra.comuna}</span>
-              <span className="text-muted-foreground">{obra.ultimaVisita}</span>
-              <span>
-                <EstadoBadge estado={obra.estado} />
-              </span>
-              <ChevronRight className="size-4 justify-self-end text-muted-foreground" />
-            </Link>
-          ))}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 px-6 py-12 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Cargando obras…
+            </div>
+          ) : isError ? (
+            <div className="px-6 py-12 text-center text-sm text-warn-fg">
+              No se pudieron cargar las obras.
+            </div>
+          ) : obras.length === 0 ? (
+            <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+              No hay obras registradas.
+            </div>
+          ) : (
+            obras.map((obra, i) => (
+              <Link
+                key={obra.id}
+                href="/formularios/epp"
+                className={cn(
+                  'grid grid-cols-[2.4fr_1.2fr_1.2fr_1fr_40px] items-center gap-4 px-6 py-5 text-sm transition-colors hover:bg-secondary',
+                  i !== obras.length - 1 && 'border-b border-border'
+                )}
+              >
+                <span className="font-bold text-foreground">{obra.nombre}</span>
+                <span className="text-muted-foreground">{obra.comuna ?? '—'}</span>
+                {/* Última visita: pendiente del módulo de visitas */}
+                <span className="text-muted-foreground">—</span>
+                <span>
+                  <EstadoBadge activa={obra.activo} />
+                </span>
+                <ChevronRight className="size-4 justify-self-end text-muted-foreground" />
+              </Link>
+            ))
+          )}
         </div>
       </main>
     </>

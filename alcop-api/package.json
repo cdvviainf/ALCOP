@@ -14,10 +14,10 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx src/scripts/seed.ts"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx src/scripts/seed.ts"
   },
   "keywords": [],
   "author": "VIAIN Asesorías Informáticas",

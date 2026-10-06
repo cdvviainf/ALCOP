@@ -50,4 +50,4 @@ EXPOSE 3001
 # tini como PID 1. El CLI `prisma` viene en dependencies (ver scaffold), así que
 # `migrate deploy` NO descarga nada en runtime.
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/scripts/seed.js && node dist/server.js"]

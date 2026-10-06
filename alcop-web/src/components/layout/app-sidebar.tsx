@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import {
   House,
   ClipboardCheck,
@@ -10,9 +11,24 @@ import {
   Folder,
   Users,
   ArrowUp,
+  LogOut,
 } from 'lucide-react'
 
 import { cn } from 'cn'
+import { api } from '@/lib/api'
+import { authClient } from '@/lib/auth-client'
+
+interface Me {
+  id: string
+  nombre: string
+  email: string
+  perfil: { id: number; nombre: string; nivelPrevencion: string; nivelTecnica: string }
+}
+
+function iniciales(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/)
+  return ((partes[0]?.[0] ?? '') + (partes[1]?.[0] ?? '')).toUpperCase() || '—'
+}
 
 /**
  * Sidebar oscuro fijo de ALCOP TERRENO (réplica del mockup web-02/03).
@@ -41,6 +57,18 @@ const NAV: NavItem[] = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get('usuarios/me').json<Me>(),
+    retry: false,
+  })
+
+  const handleLogout = async () => {
+    await authClient.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <aside className="hidden w-[260px] shrink-0 flex-col bg-panel md:flex">
@@ -92,12 +120,25 @@ export function AppSidebar() {
         <div className="mx-3 mb-3 h-px bg-white/10" />
         <div className="flex items-center gap-3 px-3.5">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-            JP
+            {me ? iniciales(me.nombre) : '…'}
           </span>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold text-white">Javiera P.</div>
-            <div className="text-xs text-panel-muted">Prevencionista</div>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="truncate text-sm font-semibold text-white">
+              {me?.nombre ?? '—'}
+            </div>
+            <div className="truncate text-xs text-panel-muted">
+              {me?.perfil.nombre ?? ''}
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+            className="rounded-md p-1.5 text-panel-muted transition-colors hover:bg-white/5 hover:text-white"
+          >
+            <LogOut className="size-[18px]" />
+          </button>
         </div>
       </div>
     </aside>

@@ -1,13 +1,10 @@
 import { createAuthClient } from 'better-auth/react'
 
-// Cliente Better Auth — placeholder de scaffold.
-// Apunta al backend alcop-api (Better Auth montado bajo /api/auth).
-// La lógica real de login/logout/sesión se cablea en una etapa posterior;
-// por ahora solo se expone el cliente para no dejar imports rotos.
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3011/api'
-
+// Las rutas de auth se proxean a través de Next.js (src/app/api/auth/[...all]/route.ts)
+// para que las cookies se setteen en el dominio del frontend y no en el del API
+// (api y web viven en subdominios distintos en el demo de Coolify).
 export const authClient = createAuthClient({
-  baseURL: API_URL.replace(/\/api$/, ''),
+  baseURL: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
 })
 
-export const { signIn, signOut, useSession } = authClient
+export type Session = typeof authClient.$Infer.Session

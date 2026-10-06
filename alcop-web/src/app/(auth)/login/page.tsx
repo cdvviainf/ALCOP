@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ArrowUp } from 'lucide-react'
 
+import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -29,6 +31,7 @@ function BrandMark({ className }: { className?: string }) {
 
 export default function LoginPage() {
   const router = useRouter()
+  const [authError, setAuthError] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -38,9 +41,23 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   })
 
-  // Navegación mock — la autenticación real se cablea con Better Auth más adelante.
-  const onSubmit = async () => {
-    router.push('/obras')
+  // Autenticación real contra Better Auth (proxy same-origin → alcop-api).
+  const onSubmit = async (data: LoginForm) => {
+    setAuthError(null)
+    const { error } = await authClient.signIn.email({
+      email: data.email,
+      password: data.password,
+    })
+    if (error) {
+      setAuthError('Credenciales inválidas. Verifica tu usuario y contraseña.')
+      return
+    }
+    const from =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('from')
+        : null
+    router.push(from && from.startsWith('/') ? from : '/obras')
+    router.refresh()
   }
 
   return (
@@ -159,12 +176,16 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {authError ? (
+              <p className="text-sm font-medium text-warn-fg">{authError}</p>
+            ) : null}
+
             <Button
               type="submit"
               disabled={isSubmitting}
               className="h-12 w-full rounded-lg bg-primary text-base font-semibold text-primary-foreground hover:bg-primary-hover"
             >
-              Ingresar
+              {isSubmitting ? 'Ingresando…' : 'Ingresar'}
             </Button>
           </form>
 

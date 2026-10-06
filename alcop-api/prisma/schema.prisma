@@ -13,6 +13,75 @@ enum NivelAcceso {
   TOTAL
 }
 
+// ─── Better Auth ────────────────────────────────────────────────────────────
+// Tablas propias de Better Auth (identidad y credenciales). El dominio vive en
+// `Usuario`, que se enlaza por `Usuario.authUserId → User.id`. En ALCOP el id de
+// dominio de Usuario YA es String (cuid), pero sigue siendo una tabla distinta:
+// Better Auth gestiona email/password/sesión; `Usuario` gestiona perfil/área.
+// No se editan a mano (nombres de campo estándar de Better Auth).
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+
+  @@map("auth_user")
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("auth_session")
+}
+
+model Account {
+  id                    String    @id
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("auth_account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("auth_verification")
+}
+
 enum RolObra {
   ADMINISTRADOR
   JEFE_DE_TERRENO
@@ -37,6 +106,10 @@ model Area {
 
 model Usuario {
   id          String   @id @default(cuid()) // String — referencia Better Auth
+  // Enlace 1:1 con la identidad de Better Auth (auth_user.id). Nullable: un
+  // Usuario puede existir sin credencial todavía; sin authUserId no autentica.
+  // Columna + @unique (sin navegación de relación: el guard hace findFirst).
+  authUserId  String?  @unique
   nombre      String
   email       String   @unique
   activo      Boolean  @default(true)
@@ -77,6 +150,9 @@ model UsuarioObra {
 model Obra {
   id          Int      @id @default(autoincrement())
   nombre      String
+  // `comuna` lo muestra el mockup "Tus obras". Obra sigue PROVISIONAL hasta el
+  // spec nucleo-compartido.md; no agregar más campos sin ese spec.
+  comuna      String?
   direccion   String?
   activo      Boolean  @default(true)
   fechaInicio DateTime?
