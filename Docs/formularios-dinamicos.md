@@ -125,7 +125,12 @@ model FormularioPermiso {
 - **Tipos de respuesta soportados en Etapa 1** (punto 2 del pedido de Christian): `CHECKBOX`, `SELECCION_MULTIPLE`, `NUMERO`, `TEXTO`, `TEXTO_LARGO`. El `CHECKBOX` reusa el patrón Cumple/No cumple/N.A. ya validado en el mockup; no es un booleano simple.
 - **Selección de obra**: vive en `RespuestaFormulario`, no en `Formulario` — un formulario es una plantilla reutilizable en cualquier obra; quien la selecciona es quien la responde, no quien la crea. (`Formulario.requiereObra` existe por si en el futuro se necesita un formulario que no dependa de obra — hoy siempre es `true`.)
 - **Registro fotográfico**: es una capacidad por pregunta (`Pregunta.permiteFoto`), no un tipo de respuesta aparte — una pregunta `CHECKBOX` puede o no pedir foto, igual que una `TEXTO`.
-- **Permisos**: el default es "todo el que tenga nivel de área ≥ LECTURA ve el formulario, y con TOTAL lo responde". `FormularioPermiso` es **solo para ampliar** — da acceso extra a alguien que por su área no lo tendría. Confirmado con Christian (04-10-2026): no existe el caso de negar/restringir; el nivel de área nunca se le quita a nadie vía `FormularioPermiso`. Una fila siempre otorga (`puedeVer`/`puedeEditar` describen cuánto acceso adicional, nunca una resta).
+- **Permisos por nivel de Área** (confirmado con Christian 06-10-2026 — el Perfil es dinámico y su nivel por Área gobierna esto):
+  - **TOTAL**: crear, editar y eliminar plantillas (Formulario/Pregunta) y categorías del área, además de ver y completar/responder.
+  - **LECTURA**: ver **y completar/responder** formularios del área — NO crea ni elimina plantillas.
+  - **SIN_ACCESO**: la sección del área no aparece.
+  > Esto **actualiza** la redacción previa de este §6 ("con TOTAL lo responde"): responder/completar es nivel **LECTURA**, no TOTAL — un trabajador de terreno debe poder llenar el checklist. TOTAL se reserva para administrar la plantilla.
+- El default de acceso a un formulario es el nivel de Área del usuario. `FormularioPermiso` es **solo para ampliar** — da acceso extra a alguien que por su área no lo tendría. Confirmado con Christian (04-10-2026): no existe el caso de negar/restringir; el nivel de área nunca se le quita a nadie vía `FormularioPermiso`. Una fila siempre otorga (`puedeVer`/`puedeEditar` describen cuánto acceso adicional, nunca una resta).
 - Una plantilla con respuestas ya registradas no se puede eliminar — solo desactivar (`activo = false`); las respuestas existentes quedan intactas.
 
 ## 7. Validaciones

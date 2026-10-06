@@ -87,3 +87,18 @@ export function requireAnyArea(min: 'LECTURA' | 'TOTAL'): preHandlerHookHandler 
     }
   }
 }
+
+/**
+ * Acceso de Administrador: nivel TOTAL en AMBAS áreas (Prevención y Técnica).
+ * Es la puerta de la configuración de núcleo (Perfil, Usuario, UsuarioObra,
+ * CategoriaFormulario) — ver Docs/plan-mantenedores.md §0 (decisión 06-10-2026).
+ * Usar después de requireAuth: lee `request.niveles` sin ir a la BD.
+ */
+export const requireAdmin: preHandlerHookHandler = async (request, reply) => {
+  const ok = cumple(request.niveles?.PREVENCION, 'TOTAL') && cumple(request.niveles?.TECNICA, 'TOTAL')
+  if (!ok) {
+    reply
+      .status(403)
+      .send({ error: { code: 'FORBIDDEN', message: 'Se requiere acceso de administrador.' } })
+  }
+}

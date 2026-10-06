@@ -83,6 +83,26 @@ app.all('/api/auth/*', forwardToBetterAuth)
 await app.register(import('./modules/health/health.routes.js'))
 await app.register(import('./modules/usuarios/usuarios.routes.js'), { prefix: '/api/usuarios' })
 await app.register(import('./modules/nucleo/obras/obras.routes.js'), { prefix: '/api/nucleo' })
+await app.register(import('./modules/nucleo/areas/areas.routes.js'), { prefix: '/api/nucleo' })
+await app.register(import('./modules/nucleo/perfiles/perfiles.routes.js'), { prefix: '/api/nucleo' })
+await app.register(import('./modules/nucleo/categorias-formulario/categorias-formulario.routes.js'), {
+  prefix: '/api/nucleo',
+})
+await app.register(import('./modules/nucleo/usuario-obras/usuario-obras.routes.js'), {
+  prefix: '/api/nucleo',
+})
+await app.register(import('./modules/prevencion/niveles-riesgo/niveles-riesgo.routes.js'), {
+  prefix: '/api/prevencion',
+})
+await app.register(import('./modules/tecnica/tipos-hallazgo/tipos-hallazgo.routes.js'), {
+  prefix: '/api/tecnica',
+})
+await app.register(import('./modules/tecnica/etapas-constructivas/etapas-constructivas.routes.js'), {
+  prefix: '/api/tecnica',
+})
+await app.register(import('./modules/tecnica/etapas-nido/etapas-nido.routes.js'), {
+  prefix: '/api/tecnica',
+})
 
 try {
   await app.listen({ port: env.PORT, host: '0.0.0.0' })

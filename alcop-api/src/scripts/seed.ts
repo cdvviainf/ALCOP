@@ -3,6 +3,7 @@ import { NivelAcceso } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { auth } from '../lib/auth.js'
 import { env } from '../config/env.js'
+import { slugCodigo } from '../shared/slug.js'
 
 // El administrador se siembra con credenciales desde el entorno (SEED_ADMIN_*).
 // NO hay password por defecto en el repo: si SEED_ADMIN_PASSWORD no está
@@ -10,16 +11,6 @@ import { env } from '../config/env.js'
 const ADMIN_EMAIL = env.SEED_ADMIN_EMAIL
 const ADMIN_PASSWORD = env.SEED_ADMIN_PASSWORD
 const ADMIN_NOMBRE = 'Administrador ALCOP'
-
-/** Slug en MAYÚSCULAS para `codigo` (p.ej. "Seguridad General" -> "SEGURIDAD_GENERAL"). */
-function slugCodigo(nombre: string): string {
-  return nombre
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // quita tildes
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-}
 
 async function seedAreas() {
   // Area.codigo es @unique → upsert idempotente directo.
@@ -115,6 +106,82 @@ async function seedObras() {
   }
 }
 
+async function seedNivelesRiesgo() {
+  // NivelRiesgo.codigo es @unique → upsert idempotente. Catálogo administrable
+  // (Docs/plan-mantenedores.md §2): esto es el punto de partida; el resto se
+  // crea/edita desde la app.
+  const niveles = [
+    { nombre: 'Alto', orden: 1 },
+    { nombre: 'Medio', orden: 2 },
+    { nombre: 'Observación', orden: 3 },
+    { nombre: 'No conformidad', orden: 4 },
+  ]
+  for (const n of niveles) {
+    const codigo = slugCodigo(n.nombre)
+    await prisma.nivelRiesgo.upsert({
+      where: { codigo },
+      update: { nombre: n.nombre, orden: n.orden },
+      create: { codigo, nombre: n.nombre, orden: n.orden, creadoPor: 'seed' },
+    })
+  }
+}
+
+async function seedTiposHallazgo() {
+  // TipoHallazgoTecnico.codigo @unique → upsert idempotente. Punto de partida.
+  const tipos = [
+    { nombre: 'No conformidad', orden: 1 },
+    { nombre: 'Mejora', orden: 2 },
+    { nombre: 'Sugerencia', orden: 3 },
+  ]
+  for (const t of tipos) {
+    const codigo = slugCodigo(t.nombre)
+    await prisma.tipoHallazgoTecnico.upsert({
+      where: { codigo },
+      update: { nombre: t.nombre, orden: t.orden },
+      create: { codigo, nombre: t.nombre, orden: t.orden, creadoPor: 'seed' },
+    })
+  }
+}
+
+async function seedEtapasConstructivas() {
+  // EtapaConstructiva.codigo @unique → upsert idempotente. Punto de partida.
+  const etapas = [
+    { nombre: 'Obra gruesa', orden: 1 },
+    { nombre: 'Faenas húmedas', orden: 2 },
+    { nombre: 'Terminaciones', orden: 3 },
+    { nombre: 'Especialidades', orden: 4 },
+    { nombre: 'Urbanización', orden: 5 },
+  ]
+  for (const e of etapas) {
+    const codigo = slugCodigo(e.nombre)
+    await prisma.etapaConstructiva.upsert({
+      where: { codigo },
+      update: { nombre: e.nombre, orden: e.orden },
+      create: { codigo, nombre: e.nombre, orden: e.orden, creadoPor: 'seed' },
+    })
+  }
+}
+
+async function seedEtapasNido() {
+  // Las 6 etapas del hito "nido", en orden (alcop-esquema.html / CLAUDE.md §7).
+  const etapas = [
+    { nombre: 'Descubierto', orden: 1 },
+    { nombre: 'Picado', orden: 2 },
+    { nombre: 'Buzón', orden: 3 },
+    { nombre: 'Llenado', orden: 4 },
+    { nombre: 'Descimbre', orden: 5 },
+    { nombre: 'Perfilado', orden: 6 },
+  ]
+  for (const e of etapas) {
+    const codigo = slugCodigo(e.nombre)
+    await prisma.etapaNido.upsert({
+      where: { codigo },
+      update: { nombre: e.nombre, orden: e.orden },
+      create: { codigo, nombre: e.nombre, orden: e.orden, creadoPor: 'seed' },
+    })
+  }
+}
+
 async function seedAdmin() {
   if (!ADMIN_PASSWORD) {
     console.warn('⚠️  SEED_ADMIN_PASSWORD no definido — se omite la creación/rotación del admin.')
@@ -178,6 +245,10 @@ async function main() {
   const { prevencion, tecnica } = await seedAreas()
   await seedPerfiles()
   await seedCategorias(prevencion.id, tecnica.id)
+  await seedNivelesRiesgo()
+  await seedTiposHallazgo()
+  await seedEtapasConstructivas()
+  await seedEtapasNido()
   await seedObras()
   // El seed del admin es best-effort: un fallo acá NO debe abortar el arranque
   // del contenedor (el CMD encadena `seed && server`).
@@ -186,7 +257,10 @@ async function main() {
   } catch (err) {
     console.warn('⚠️  Seed de admin falló (no bloquea el arranque):', (err as Error).message)
   }
-  console.log('✅ Seed completado: 2 Areas, 6 Perfiles, 11 Categorías, 4 Obras.')
+  console.log(
+    '✅ Seed completado: 2 Areas, 6 Perfiles, 11 Categorías, 4 Niveles de riesgo, ' +
+      '3 Tipos de hallazgo, 5 Etapas constructivas, 6 Etapas de nido, 4 Obras.'
+  )
 }
 
 main()

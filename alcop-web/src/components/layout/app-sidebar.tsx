@@ -10,6 +10,13 @@ import {
   BarChart,
   Folder,
   Users,
+  ShieldAlert,
+  ListChecks,
+  Layers,
+  Boxes,
+  FolderTree,
+  IdCard,
+  Link2,
   ArrowUp,
   LogOut,
 } from 'lucide-react'
@@ -49,10 +56,17 @@ interface NavItem {
 const NAV: NavItem[] = [
   { title: 'Obras', href: '/obras', icon: House },
   { title: 'Formularios', href: '/formularios', icon: ClipboardCheck },
+  { title: 'Categorías', href: '/formularios/categorias', icon: FolderTree },
   { title: 'Hallazgos', href: '/hallazgos', icon: Flag },
+  { title: 'Niveles de riesgo', href: '/prevencion/niveles-riesgo', icon: ShieldAlert },
+  { title: 'Tipos de hallazgo', href: '/tecnica/tipos-hallazgo', icon: ListChecks },
+  { title: 'Etapas constructivas', href: '/tecnica/etapas-constructivas', icon: Layers },
+  { title: 'Etapas de nido', href: '/tecnica/etapas-nido', icon: Boxes },
   { title: 'Analítica', href: '/analitica', icon: BarChart },
   { title: 'Biblioteca', href: '/biblioteca', icon: Folder },
   { title: 'Usuarios', href: '/usuarios', icon: Users },
+  { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard },
+  { title: 'Asignaciones', href: '/usuarios/asignaciones', icon: Link2 },
 ]
 
 export function AppSidebar() {
@@ -85,8 +99,14 @@ export function AppSidebar() {
       {/* Navegación */}
       <nav className="mt-2 flex-1 px-3">
         <ul className="space-y-1">
-          {NAV.map((item) => {
-            const isActive = pathname.startsWith(item.href)
+          {(() => {
+            // El prefijo coincidente más específico es el único activo (evita que
+            // "Usuarios" y "Perfiles" se marquen a la vez).
+            const activo = NAV.map((i) => i.href)
+              .filter((h) => pathname === h || pathname.startsWith(h + '/'))
+              .sort((a, b) => b.length - a.length)[0]
+            return NAV.map((item) => {
+            const isActive = item.href === activo
             return (
               <li key={item.href}>
                 <Link
@@ -111,7 +131,8 @@ export function AppSidebar() {
                 </Link>
               </li>
             )
-          })}
+            })
+          })()}
         </ul>
       </nav>
 

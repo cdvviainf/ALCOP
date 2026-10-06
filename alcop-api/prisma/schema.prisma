@@ -163,13 +163,81 @@ model Obra {
   eliminadoEn DateTime?
 }
 
+// ─── Catálogos por Área ───────────────────────────────────────────────────
+// Catálogos administrables simples (Docs/plan-mantenedores.md §2). Patrón común:
+// id, codigo @unique (slug del nombre), nombre, orden, activo, auditoría + soft
+// delete. Servidos por el factory shared/catalogo.factory.ts.
+
+// Catálogo de Prevención: severidad de un hallazgo (Alto, Medio, Observación,
+// No conformidad). Referenciado a futuro por Hallazgo (módulo prevencion.md).
+model NivelRiesgo {
+  id           Int       @id @default(autoincrement())
+  codigo       String    @unique
+  nombre       String
+  orden        Int       @default(0)
+  activo       Boolean   @default(true)
+  creadoEn     DateTime  @default(now())
+  creadoPor    String?
+  eliminadoEn  DateTime?
+  eliminadoPor String?
+}
+
+// Catálogo de Técnica: tipo de hallazgo técnico (No conformidad, Mejora,
+// Sugerencia). Tabla separada de EtapaConstructiva (decisión 06-10-2026).
+model TipoHallazgoTecnico {
+  id           Int       @id @default(autoincrement())
+  codigo       String    @unique
+  nombre       String
+  orden        Int       @default(0)
+  activo       Boolean   @default(true)
+  creadoEn     DateTime  @default(now())
+  creadoPor    String?
+  eliminadoEn  DateTime?
+  eliminadoPor String?
+}
+
+// Catálogo de Técnica: etapa constructiva de la obra (Obra gruesa, Faenas
+// húmedas, Terminaciones, Especialidades, Urbanización).
+model EtapaConstructiva {
+  id           Int       @id @default(autoincrement())
+  codigo       String    @unique
+  nombre       String
+  orden        Int       @default(0)
+  activo       Boolean   @default(true)
+  creadoEn     DateTime  @default(now())
+  creadoPor    String?
+  eliminadoEn  DateTime?
+  eliminadoPor String?
+}
+
+// Catálogo de Técnica: etapas del hito "nido" (6, ordenadas): Descubierto →
+// Picado → Buzón → Llenado → Descimbre → Perfilado. `orden` es significativo.
+model EtapaNido {
+  id           Int       @id @default(autoincrement())
+  codigo       String    @unique
+  nombre       String
+  orden        Int       @default(0)
+  activo       Boolean   @default(true)
+  creadoEn     DateTime  @default(now())
+  creadoPor    String?
+  eliminadoEn  DateTime?
+  eliminadoPor String?
+}
+
 model CategoriaFormulario {
-  id          Int          @id @default(autoincrement())
-  areaId      Int
-  area        Area         @relation(fields: [areaId], references: [id])
-  codigo      String
-  nombre      String
-  formularios Formulario[]
+  id           Int          @id @default(autoincrement())
+  areaId       Int
+  area         Area         @relation(fields: [areaId], references: [id])
+  codigo       String // slug del nombre, único por área (validado en la app)
+  nombre       String
+  // Campos de mantenedor (ampliación del spec formularios-dinamicos.md §4,
+  // 06-10-2026): estado + soft delete + auditoría, aditivos con default.
+  activo       Boolean      @default(true)
+  formularios  Formulario[]
+  creadoEn     DateTime     @default(now())
+  creadoPor    String?
+  eliminadoEn  DateTime?
+  eliminadoPor String?
 }
 
 model Formulario {

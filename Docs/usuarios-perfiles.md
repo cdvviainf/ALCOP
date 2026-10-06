@@ -122,5 +122,6 @@ enum RolObra {
 ## 10. Pendientes
 
 - [x] Confirmar nivelTecnica de "Jefe Prevencionista" — **SIN_ACCESO**, confirmado 04-10-2026 (ver nota en §6).
-- [ ] Definir si el panel de Usuarios y Admin permite crear Perfiles nuevos (niveles custom) o si los 6 perfiles de la tabla son fijos y no editables desde la UI en la Etapa 1.
+- [x] Definir si el panel permite crear Perfiles nuevos (niveles custom) o si los 6 son fijos — **confirmado 06-10-2026: Perfiles 100% dinámicos**, CRUD completo desde la UI (admin define nombre + nivel por área). Los 6 de §6 son seed inicial. El nivel por área gobierna crear/eliminar (TOTAL) vs ver/completar (LECTURA) formularios.
 - [ ] Definir SLA/journal de auditoría cuando se reemplaza un `UsuarioObra` (¿se notifica al saliente?).
+- [ ] **Compatibilidad perfil↔rol tras la asignación** (QA Fase C, 06-10-2026): hoy §7 solo valida al **asignar** un titular. Si después se cambia el `perfilId` del usuario o se bajan los niveles del perfil, un titular puede quedar incompatible (p. ej. Prevencionista con `SIN_ACCESO` en Prevención) y seguir recibiendo notificaciones. El spec no define qué hacer: (1) permitir y advertir [coherente con el "bloqueo blando" de §6], (2) rechazar el cambio, o (3) retirar la asignación automáticamente. **Decisión 06-10-2026: opción 1 — no se enforza en Etapa 1**, se resuelve al especificar `alertas.md`/validaciones de obra. No es un defecto exigible todavía.
