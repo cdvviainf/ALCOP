@@ -1,133 +1,175 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, Loader2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import { Loader2, Users } from 'lucide-react'
+import { z } from 'zod'
 
-import { cn } from 'cn'
 import { api } from '@/lib/api'
+import { cn } from 'cn'
 import { TopBar } from '@/components/layout/top-bar'
+import {
+  CrudMaintainer,
+  type CrudColumn,
+  type CrudFieldOption,
+} from '@/components/shared/crud-maintainer'
 
-interface Obra {
+interface Me {
+  perfil: { nivelPrevencion: string; nivelTecnica: string }
+}
+
+interface Obra extends Record<string, unknown> {
   id: number
+  codigo: string
   nombre: string
-  comuna: string | null
+  mandante: string | null
   direccion: string | null
-  activo: boolean
+  comuna: string | null
   fechaInicio: string | null
+  fechaTerminoEstimada: string | null
+  estado: 'SIN_INICIAR' | 'EN_EJECUCION' | 'SUSPENDIDA' | 'TERMINADA'
   creadoEn: string
 }
 
-interface ObrasResponse {
-  data: Obra[]
-  meta: { total: number; page: number; limit: number; totalPages: number }
-}
+const ESTADOS: CrudFieldOption[] = [
+  { value: 'SIN_INICIAR', label: 'Sin iniciar' },
+  { value: 'EN_EJECUCION', label: 'En ejecución' },
+  { value: 'SUSPENDIDA', label: 'Suspendida' },
+  { value: 'TERMINADA', label: 'Terminada' },
+]
 
-function EstadoBadge({ activa }: { activa: boolean }) {
-  // Placeholder: el estado real (AL DÍA / PENDIENTE) vendrá del módulo de
-  // visitas (pendiente de spec en tecnica.md / prevencion.md). Por ahora toda
-  // obra activa se muestra "AL DÍA".
+// Campos opcionales: '' -> null, para poder limpiarlos (el backend acepta null
+// y coacciona las fechas con z.coerce.date()). OBR-005.
+const opcText = z.preprocess(
+  (v) => (v === '' || v == null ? null : v),
+  z.string().trim().min(1).nullable().optional()
+)
+const opcFecha = z.preprocess(
+  (v) => (v === '' || v == null ? null : v),
+  z.string().nullable().optional()
+)
+
+const schema = z
+  .object({
+    codigo: z.string().trim().min(1, 'El código es obligatorio'),
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+    mandante: opcText,
+    direccion: opcText,
+    comuna: opcText,
+    estado: z.enum(['SIN_INICIAR', 'EN_EJECUCION', 'SUSPENDIDA', 'TERMINADA']),
+    fechaInicio: opcFecha,
+    fechaTerminoEstimada: opcFecha,
+  })
+  // El término no puede ser anterior al inicio (OBR-004).
+  .refine(
+    (d) => !d.fechaInicio || !d.fechaTerminoEstimada || new Date(d.fechaTerminoEstimada) >= new Date(d.fechaInicio),
+    { message: 'El término no puede ser anterior al inicio.', path: ['fechaTerminoEstimada'] }
+  )
+type FormValues = z.infer<typeof schema>
+
+function EstadoBadge({ estado }: { estado: Obra['estado'] }) {
+  const label = ESTADOS.find((e) => e.value === estado)?.label ?? estado
   return (
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
-        activa ? 'bg-ok-bg text-ok-fg' : 'bg-warn-bg text-warn-fg'
+        estado === 'EN_EJECUCION'
+          ? 'bg-ok-bg text-ok-fg'
+          : estado === 'SUSPENDIDA'
+            ? 'bg-warn-bg text-warn-fg'
+            : 'bg-secondary text-foreground'
       )}
     >
-      {activa ? 'AL DÍA' : 'INACTIVA'}
+      {label.toUpperCase()}
     </span>
   )
 }
 
+const columns: CrudColumn<Obra>[] = [
+  { key: 'codigo', header: 'Código', render: (row) => <span className="font-mono text-xs text-muted-foreground">{row.codigo}</span> },
+  { key: 'nombre', header: 'Obra', render: (row) => <span className="font-medium">{row.nombre}</span> },
+  { key: 'comuna', header: 'Comuna', render: (row) => <span className="text-muted-foreground">{row.comuna ?? '—'}</span> },
+  { key: 'estado', header: 'Estado', render: (row) => <EstadoBadge estado={row.estado} /> },
+  {
+    key: '__titulares',
+    header: '',
+    render: (row) => (
+      <Link
+        href={`/obras/${row.id}`}
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-secondary"
+      >
+        <Users className="size-3.5" />
+        Titulares
+      </Link>
+    ),
+  },
+]
+
+function fechaInput(iso: string | null): string {
+  return iso ? iso.slice(0, 10) : ''
+}
+
 export default function ObrasPage() {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['obras'],
-    queryFn: () => api.get('nucleo/obras').json<ObrasResponse>(),
+  const { data: me, isLoading } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get('usuarios/me').json<Me>(),
+    retry: false,
   })
-
-  const obras = data?.data ?? []
-  const activas = obras.filter((o) => o.activo).length
-
-  const stats = [
-    { label: 'OBRAS ACTIVAS', value: String(activas), accent: false },
-    // Placeholders hasta el módulo de visitas (sin spec aún).
-    { label: 'VISITAS ESTA SEMANA', value: '—', accent: false },
-    { label: 'PENDIENTES', value: '—', accent: true },
-  ]
+  const esAdmin = me?.perfil.nivelPrevencion === 'TOTAL' && me?.perfil.nivelTecnica === 'TOTAL'
 
   return (
     <>
       <TopBar />
       <main className="flex-1 p-8">
-        <h1 className="text-2xl font-bold text-foreground">Tus obras</h1>
-
-        {/* Stat cards */}
-        <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-xl border border-border bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-            >
-              <p className="text-xs font-semibold tracking-[0.12em] text-label">
-                {stat.label}
-              </p>
-              <p
-                className={cn(
-                  'mt-3 text-4xl font-bold',
-                  stat.accent ? 'text-primary' : 'text-foreground'
-                )}
-              >
-                {stat.value}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Tabla de obras */}
-        <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-          <div className="grid grid-cols-[2.4fr_1.2fr_1.2fr_1fr_40px] items-center gap-4 border-b border-border px-6 py-4 text-xs font-semibold tracking-[0.12em] text-label">
-            <span>OBRA</span>
-            <span>COMUNA</span>
-            <span>ÚLTIMA VISITA</span>
-            <span>ESTADO</span>
-            <span />
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Cargando…
           </div>
-
-          {isLoading ? (
-            <div className="flex items-center justify-center gap-2 px-6 py-12 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Cargando obras…
-            </div>
-          ) : isError ? (
-            <div className="px-6 py-12 text-center text-sm text-warn-fg">
-              No se pudieron cargar las obras.
-            </div>
-          ) : obras.length === 0 ? (
-            <div className="px-6 py-12 text-center text-sm text-muted-foreground">
-              No hay obras registradas.
-            </div>
-          ) : (
-            obras.map((obra, i) => (
-              <Link
-                key={obra.id}
-                href="/formularios/epp"
-                className={cn(
-                  'grid grid-cols-[2.4fr_1.2fr_1.2fr_1fr_40px] items-center gap-4 px-6 py-5 text-sm transition-colors hover:bg-secondary',
-                  i !== obras.length - 1 && 'border-b border-border'
-                )}
-              >
-                <span className="font-bold text-foreground">{obra.nombre}</span>
-                <span className="text-muted-foreground">{obra.comuna ?? '—'}</span>
-                {/* Última visita: pendiente del módulo de visitas */}
-                <span className="text-muted-foreground">—</span>
-                <span>
-                  <EstadoBadge activa={obra.activo} />
-                </span>
-                <ChevronRight className="size-4 justify-self-end text-muted-foreground" />
-              </Link>
-            ))
-          )}
-        </div>
+        ) : (
+          <CrudMaintainer<Obra, FormValues>
+            titulo="Obras"
+            descripcion="Raíz del sistema. Código único, estado y titulares de notificación por obra."
+            endpoint="nucleo/obras"
+            queryKey="obras"
+            columns={columns}
+            fields={[
+              { name: 'codigo', label: 'Código', placeholder: 'Ej. MPR' },
+              { name: 'nombre', label: 'Nombre', placeholder: 'Nombre de la obra' },
+              { name: 'mandante', label: 'Mandante' },
+              { name: 'direccion', label: 'Dirección' },
+              { name: 'comuna', label: 'Comuna' },
+              { name: 'estado', label: 'Estado', type: 'select', options: ESTADOS, soloEdicion: true },
+              { name: 'fechaInicio', label: 'Fecha de inicio', type: 'date' },
+              { name: 'fechaTerminoEstimada', label: 'Término estimado', type: 'date' },
+            ]}
+            schema={schema}
+            defaultValues={{
+              codigo: '',
+              nombre: '',
+              mandante: '',
+              direccion: '',
+              comuna: '',
+              estado: 'SIN_INICIAR',
+              fechaInicio: '',
+              fechaTerminoEstimada: '',
+            }}
+            toFormValues={(row) => ({
+              codigo: row.codigo,
+              nombre: row.nombre,
+              mandante: row.mandante ?? '',
+              direccion: row.direccion ?? '',
+              comuna: row.comuna ?? '',
+              estado: row.estado,
+              fechaInicio: fechaInput(row.fechaInicio),
+              fechaTerminoEstimada: fechaInput(row.fechaTerminoEstimada),
+            })}
+            rowLabel={(row) => row.nombre}
+            puedeEditar={esAdmin}
+            searchPlaceholder="Buscar por nombre o código…"
+            emptyMessage="No hay obras."
+          />
+        )}
       </main>
     </>
   )

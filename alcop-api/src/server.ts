@@ -88,9 +88,6 @@ await app.register(import('./modules/nucleo/perfiles/perfiles.routes.js'), { pre
 await app.register(import('./modules/nucleo/categorias-formulario/categorias-formulario.routes.js'), {
   prefix: '/api/nucleo',
 })
-await app.register(import('./modules/nucleo/usuario-obras/usuario-obras.routes.js'), {
-  prefix: '/api/nucleo',
-})
 await app.register(import('./modules/prevencion/niveles-riesgo/niveles-riesgo.routes.js'), {
   prefix: '/api/prevencion',
 })

@@ -31,7 +31,7 @@ La mayoría de los mantenedores son el mismo CRUD. Antes de replicarlos conviene
 | Perfil | ✅ (+seed 6) | ✅ CRUD `/api/nucleo/perfiles` (requireAdmin, guard borrado) | ✅ `/usuarios/perfiles` (selects de nivel) |
 | Usuario | ✅ (+ Better Auth) | ✅ CRUD `/api/usuarios` (requireAdmin, alta atómica, guard 90d) | ✅ `/usuarios` |
 | UsuarioObra | ✅ | ✅ `/api/nucleo/usuario-obras` (requireAdmin, validación §7) | ✅ `/usuarios/asignaciones` (UI a medida) |
-| Obra | ⚠️ mínimo (provisional) | ✅ CRUD `/api/nucleo/obras` | ⚠️ solo lista (sin alta/edición) |
+| Obra | ✅ definitivo (codigo/estado/mandante/fechas/auditoría, spec `nucleo-compartido.md`) | ✅ CRUD + titulares `/api/nucleo/obras` | ✅ `/obras` + detalle `/obras/[id]` (titulares) |
 | CategoriaFormulario | ✅ (+activo/soft-delete/auditoría, +seed 11) | ✅ CRUD `/api/nucleo/categorias-formulario` (authz TOTAL-en-área) | ✅ `/formularios/categorias` |
 | Area | ✅ | ✅ GET lectura `/api/nucleo/areas` (repo pattern pend. Fase D) | — (llena selects) |
 | Formulario / Pregunta | ✅ | ❌ | ⚠️ checklist EPP mock |
@@ -69,7 +69,7 @@ Leyenda: **M**=modelo Prisma · **B**=endpoints · **S**=seed · **F**=UI · **A
 ### Con estructura / reglas propias
 | # | Mantenedor | Qué falta | Reglas clave |
 |---|---|---|---|
-| 10 | **Obra** | B ✅; F (alta/edición); completar **M** | Esperar modelo definitivo de `nucleo-compartido.md` antes de congelar la UI |
+| 10 | **Obra** | ✅ hecho (modelo definitivo + CRUD + titulares + UI) | Spec `nucleo-compartido.md` cerrado; absorbe la asignación de titulares (varios por rol); pasó el ciclo Codex |
 | 11 | **Perfil** | B (CRUD) + F | **Editable desde UI** (CRUD completo de niveles, confirmado 06-10-2026; los 6 seed son punto de partida). Nivel por Área, no por ítem |
 | 12 | **Usuario** | B (CRUD + alta vía Better Auth) + F | Alta la hace Administrador (registro público deshabilitado); enlazar `authUserId`; soft-delete con regla de 90 días (usuarios-perfiles §7) |
 | 13 | **UsuarioObra** | B + F | Una obra = 1 titular por `RolObra` (`@@unique`); validar nivel del usuario (usuarios-perfiles §7); dispara alertas |

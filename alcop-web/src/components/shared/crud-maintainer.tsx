@@ -55,7 +55,7 @@ export interface CrudColumn<T> {
   render?: (row: T) => React.ReactNode
 }
 
-export type CrudFieldType = 'text' | 'number' | 'checkbox' | 'select' | 'password'
+export type CrudFieldType = 'text' | 'number' | 'checkbox' | 'select' | 'password' | 'date'
 
 export interface CrudFieldOption {
   value: string
@@ -72,6 +72,8 @@ export interface CrudField {
   options?: CrudFieldOption[]
   /** Si true, el campo solo se muestra al crear (no al editar). Útil para contraseñas. */
   soloAlta?: boolean
+  /** Si true, el campo solo se muestra al editar (no al crear). Útil para `estado`. */
+  soloEdicion?: boolean
 }
 
 export interface CrudMaintainerProps<T extends { id: string | number }, TForm extends FieldValues> {
@@ -477,7 +479,7 @@ function CrudFormDialog<TForm extends FieldValues>({
         className="space-y-4"
       >
         {fields
-          .filter((f) => !(f.soloAlta && modo === 'editar'))
+          .filter((f) => !(f.soloAlta && modo === 'editar') && !(f.soloEdicion && modo === 'crear'))
           .map((f) => {
             const error = (errors as Record<string, { message?: string } | undefined>)[f.name]
             const tipo = f.type ?? 'text'
@@ -527,7 +529,15 @@ function CrudFormDialog<TForm extends FieldValues>({
                     <Label htmlFor={f.name}>{f.label}</Label>
                     <Input
                       id={f.name}
-                      type={tipo === 'number' ? 'number' : tipo === 'password' ? 'password' : 'text'}
+                      type={
+                        tipo === 'number'
+                          ? 'number'
+                          : tipo === 'password'
+                            ? 'password'
+                            : tipo === 'date'
+                              ? 'date'
+                              : 'text'
+                      }
                       placeholder={f.placeholder}
                       autoComplete={tipo === 'password' ? 'new-password' : undefined}
                       aria-invalid={error ? true : undefined}

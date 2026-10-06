@@ -88,6 +88,13 @@ enum RolObra {
   PREVENCIONISTA
 }
 
+enum EstadoObra {
+  SIN_INICIAR
+  EN_EJECUCION
+  SUSPENDIDA
+  TERMINADA
+}
+
 enum TipoRespuesta {
   CHECKBOX
   SELECCION_MULTIPLE
@@ -133,34 +140,46 @@ model Perfil {
   eliminadoEn     DateTime?
 }
 
+// Asignación de titulares de obra (nucleo-compartido.md §4). Varios usuarios por
+// rol; un usuario puede tener más de un rol. El @@unique evita duplicar la misma
+// persona en el mismo rol de la misma obra.
 model UsuarioObra {
-  id        Int      @id @default(autoincrement())
-  usuarioId String
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
-  obraId    Int
-  obra      Obra     @relation(fields: [obraId], references: [id])
-  rolObra   RolObra
-  creadoEn  DateTime @default(now())
+  id           Int       @id @default(autoincrement())
+  usuarioId    String
+  usuario      Usuario   @relation(fields: [usuarioId], references: [id])
+  obraId       Int
+  obra         Obra      @relation(fields: [obraId], references: [id])
+  rolObra        RolObra
+  creadoEn       DateTime  @default(now())
+  creadoPor      String?
+  actualizadoEn  DateTime? @updatedAt
+  actualizadoPor String?
+  eliminadoEn    DateTime?
+  eliminadoPor   String?
 
-  @@unique([obraId, rolObra])
+  @@unique([obraId, rolObra, usuarioId])
 }
 
-// Obra es MÍNIMA y PROVISIONAL — el spec nucleo-compartido.md está pendiente.
-// Campos según Docs/00-mantenedores-requeridos.md #10.
+// Obra — raíz del sistema. Modelo definitivo según Docs/nucleo-compartido.md §4.
 model Obra {
-  id          Int      @id @default(autoincrement())
-  nombre      String
-  // `comuna` lo muestra el mockup "Tus obras". Obra sigue PROVISIONAL hasta el
-  // spec nucleo-compartido.md; no agregar más campos sin ese spec.
-  comuna      String?
-  direccion   String?
-  activo      Boolean  @default(true)
-  fechaInicio DateTime?
-  usuarios    UsuarioObra[]
-  respuestas  RespuestaFormulario[]
-  creadoEn    DateTime @default(now())
-  creadoPor   String?
-  eliminadoEn DateTime?
+  id                   Int        @id @default(autoincrement())
+  codigo               String     @unique // identificador interno, obligatorio y único
+  nombre               String
+  mandante             String?
+  direccion            String?
+  comuna               String?
+  fechaInicio          DateTime?
+  fechaTerminoEstimada DateTime?
+  estado               EstadoObra @default(SIN_INICIAR)
+  usuarios             UsuarioObra[]
+  respuestas           RespuestaFormulario[]
+  // Auditoría completa (nucleo-compartido.md §6 — convención canónica).
+  creadoEn             DateTime   @default(now())
+  creadoPor            String?
+  actualizadoEn        DateTime?  @updatedAt
+  actualizadoPor       String?
+  eliminadoEn          DateTime?
+  eliminadoPor         String?
 }
 
 // ─── Catálogos por Área ───────────────────────────────────────────────────

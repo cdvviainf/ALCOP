@@ -145,7 +145,7 @@ export const usuariosService = {
     const desde = new Date(Date.now() - DIAS_GUARD_BORRADO * 24 * 60 * 60 * 1000)
     const recientes = await usuariosRepository.contarRespuestasDesde(id, desde)
     const eliminar = recientes === 0
-    await usuariosRepository.retirar(id, eliminar)
+    await usuariosRepository.retirar(id, eliminar, solicitanteId)
     return eliminar ? 'eliminado' : 'desactivado'
   },
 }

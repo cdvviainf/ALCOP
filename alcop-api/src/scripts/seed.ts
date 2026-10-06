@@ -87,21 +87,26 @@ async function seedCategorias(areaPrevencionId: number, areaTecnicaId: number) {
 }
 
 async function seedObras() {
-  // Match del mockup "Tus obras". Idempotente por nombre (Obra.nombre no es @unique).
-  const obras: Array<{ nombre: string; comuna: string | null }> = [
-    { nombre: 'Condominio Mirador Piedra Roja', comuna: 'Chicureo' },
-    { nombre: 'Condominio Chamisero III', comuna: null },
-    { nombre: 'Condominio Casas Olmo', comuna: null },
-    { nombre: 'Condominio Mirador del Alto', comuna: 'San Esteban' },
+  // Match del mockup "Tus obras". Idempotente por codigo (@unique).
+  const obras: Array<{ codigo: string; nombre: string; comuna: string | null }> = [
+    { codigo: 'MPR', nombre: 'Condominio Mirador Piedra Roja', comuna: 'Chicureo' },
+    { codigo: 'CH3', nombre: 'Condominio Chamisero III', comuna: null },
+    { codigo: 'OLM', nombre: 'Condominio Casas Olmo', comuna: null },
+    { codigo: 'MDA', nombre: 'Condominio Mirador del Alto', comuna: 'San Esteban' },
   ]
   for (const o of obras) {
+    // Reconcilia por nombre (las filas backfilleadas de la migración tienen
+    // codigo 'OBRA-<id>'); así el seed les fija el código definitivo sin duplicar.
     const existente = await prisma.obra.findFirst({ where: { nombre: o.nombre, eliminadoEn: null } })
-    if (!existente) {
-      await prisma.obra.create({
-        data: { nombre: o.nombre, comuna: o.comuna, creadoPor: 'seed' },
+    if (existente) {
+      await prisma.obra.update({
+        where: { id: existente.id },
+        data: { codigo: o.codigo, comuna: o.comuna },
       })
-    } else if (existente.comuna !== o.comuna) {
-      await prisma.obra.update({ where: { id: existente.id }, data: { comuna: o.comuna } })
+    } else {
+      await prisma.obra.create({
+        data: { codigo: o.codigo, nombre: o.nombre, comuna: o.comuna, estado: 'EN_EJECUCION', creadoPor: 'seed' },
+      })
     }
   }
 }

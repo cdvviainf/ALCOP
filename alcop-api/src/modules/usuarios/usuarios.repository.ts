@@ -148,9 +148,14 @@ export const usuariosRepository = {
    * siempre borra sus asignaciones `UsuarioObra` (ya no puede ser titular — QA-C-004)
    * y, según `eliminar`, lo soft-deletea o solo lo desactiva (QA-C-003).
    */
-  async retirar(id: string, eliminar: boolean) {
+  async retirar(id: string, eliminar: boolean, eliminadoPor: string) {
     return prisma.$transaction(async (tx) => {
-      await tx.usuarioObra.deleteMany({ where: { usuarioId: id } })
+      // Soft-delete de las asignaciones (UsuarioObra es registro de negocio —
+      // nunca DELETE físico, CLAUDE.md §12.7 / nucleo-compartido.md §6, OBR-002).
+      await tx.usuarioObra.updateMany({
+        where: { usuarioId: id, eliminadoEn: null },
+        data: { eliminadoEn: new Date(), eliminadoPor },
+      })
       return tx.usuario.update({
         where: { id },
         data: eliminar ? { eliminadoEn: new Date(), activo: false } : { activo: false },
