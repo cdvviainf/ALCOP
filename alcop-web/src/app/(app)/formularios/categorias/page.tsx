@@ -19,6 +19,10 @@ interface Area {
   nombre: string
 }
 
+interface Me {
+  perfil: { nivelPrevencion: string; nivelTecnica: string }
+}
+
 interface Categoria extends Record<string, unknown> {
   id: number
   areaId: number
@@ -68,8 +72,24 @@ export default function CategoriasFormularioPage() {
     queryKey: ['areas'],
     queryFn: () => api.get('nucleo/areas').json<{ data: Area[] }>(),
   })
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get('usuarios/me').json<Me>(),
+    retry: false,
+  })
+
   const areas = areasResp?.data ?? []
-  const areaOptions: CrudFieldOption[] = areas.map((a) => ({ value: String(a.id), label: a.nombre }))
+  const tieneTotal = (codigo: string) =>
+    codigo === 'PREVENCION'
+      ? me?.perfil.nivelPrevencion === 'TOTAL'
+      : me?.perfil.nivelTecnica === 'TOTAL'
+
+  // El alta solo ofrece las áreas que el usuario administra (TOTAL).
+  const areaOptions: CrudFieldOption[] = areas
+    .filter((a) => tieneTotal(a.codigo))
+    .map((a) => ({ value: String(a.id), label: a.nombre }))
+  const primeraAreaAdmin = areas.find((a) => tieneTotal(a.codigo))
+  const puedeCrear = areaOptions.length > 0
 
   return (
     <>
@@ -93,8 +113,10 @@ export default function CategoriasFormularioPage() {
               { name: 'activo', label: 'Activa', type: 'checkbox' },
             ]}
             schema={schema}
-            defaultValues={{ areaId: areas[0]?.id ?? 0, nombre: '', activo: true }}
+            defaultValues={{ areaId: primeraAreaAdmin?.id ?? 0, nombre: '', activo: true }}
             toFormValues={(row) => ({ areaId: row.areaId, nombre: row.nombre, activo: row.activo })}
+            puedeCrear={puedeCrear}
+            puedeEditar={(row) => tieneTotal(row.areaCodigo)}
             searchPlaceholder="Buscar categoría…"
             emptyMessage="No hay categorías."
           />

@@ -6,11 +6,13 @@ import type { ActualizarCategoriaInput } from './categorias-formulario.schema.js
 
 /** Acceso a datos de CategoriaFormulario (CLAUDE.md §12.2). */
 export const categoriasRepository = {
-  async listar(pagination: PaginationQuery, q?: string, areaId?: number) {
+  async listar(pagination: PaginationQuery, q?: string, areaId?: number, codigosArea?: string[]) {
     const where: Prisma.CategoriaFormularioWhereInput = {
       eliminadoEn: null,
       ...(q ? { nombre: { contains: q, mode: 'insensitive' } } : {}),
       ...(areaId ? { areaId } : {}),
+      // Restringe a las áreas accesibles del solicitante (visibilidad §5/§6).
+      ...(codigosArea ? { area: { codigo: { in: codigosArea } } } : {}),
     }
     const { skip, take } = toPrismaRange(pagination)
 

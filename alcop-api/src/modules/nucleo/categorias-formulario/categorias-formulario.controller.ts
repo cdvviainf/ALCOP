@@ -12,12 +12,12 @@ import { categoriasService } from './categorias-formulario.service.js'
 export const categoriasController = {
   async listar(request: FastifyRequest, reply: FastifyReply) {
     const { page, limit, q, areaId } = listarCategoriasQuerySchema.parse(request.query)
-    return reply.send(await categoriasService.listar({ page, limit }, q, areaId))
+    return reply.send(await categoriasService.listar({ page, limit }, request.niveles, q, areaId))
   },
 
   async obtener(request: FastifyRequest, reply: FastifyReply) {
     const { id } = categoriaIdParamSchema.parse(request.params)
-    return reply.send(await categoriasService.obtener(id))
+    return reply.send(await categoriasService.obtener(id, request.niveles))
   },
 
   async crear(request: FastifyRequest, reply: FastifyReply) {

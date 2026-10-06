@@ -53,16 +53,28 @@ function exigirTotalEnArea(niveles: NivelesPorArea, areaCodigo: string) {
 export const categoriasService = {
   async listar(
     pagination: PaginationQuery,
+    niveles: NivelesPorArea,
     q?: string,
     areaId?: number
   ): Promise<Paginated<CategoriaFormularioDTO>> {
-    const { rows, total } = await categoriasRepository.listar(pagination, q, areaId)
+    // Solo las áreas donde el solicitante tiene acceso (≥ LECTURA). Un usuario de
+    // una sola área ve únicamente sus categorías (usuarios-perfiles.md §5/§6).
+    const codigosArea = (['PREVENCION', 'TECNICA'] as const).filter(
+      (c) => (niveles?.[c] ?? 'SIN_ACCESO') !== 'SIN_ACCESO'
+    )
+    const { rows, total } = await categoriasRepository.listar(pagination, q, areaId, codigosArea)
     return paginate(rows.map(toDTO), total, pagination)
   },
 
-  async obtener(id: number): Promise<CategoriaFormularioDTO> {
+  async obtener(id: number, niveles: NivelesPorArea): Promise<CategoriaFormularioDTO> {
     const row = await categoriasRepository.buscarPorId(id)
     if (!row) throw new NotFoundError('Categoría de formulario', String(id))
+    // Visibilidad por área (FAD-003): si el solicitante no tiene acceso al área de
+    // la categoría, se responde 404 (no se revela que existe en otra área).
+    const codigo = row.area.codigo as 'PREVENCION' | 'TECNICA'
+    if ((niveles?.[codigo] ?? 'SIN_ACCESO') === 'SIN_ACCESO') {
+      throw new NotFoundError('Categoría de formulario', String(id))
+    }
     return toDTO(row)
   },
 

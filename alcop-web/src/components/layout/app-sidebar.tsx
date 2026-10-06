@@ -40,34 +40,52 @@ function iniciales(nombre: string): string {
 /**
  * Sidebar oscuro fijo de ALCOP TERRENO (réplica del mockup web-02/03).
  *
- * NOTA — Visibilidad por Área (pendiente de cablear): la navegación real
- * se filtrará según los niveles de acceso por Área del usuario
- * (nivelPrevencion / nivelTecnica) desde GET /api/usuarios/me — ver
- * CLAUDE.md §11 y Docs/usuarios-perfiles.md. Por ahora es estática con
- * datos mock.
+ * Visibilidad por Área (CLAUDE.md §11, Docs/usuarios-perfiles.md §6,
+ * alcop-esquema.html §05): cada item declara qué requiere y se filtra según los
+ * niveles del perfil del usuario (nivelPrevencion / nivelTecnica desde
+ * GET /api/usuarios/me):
+ *   - 'nucleo'     → ≥ LECTURA en al menos un área (núcleo compartido).
+ *   - 'prevencion' → nivelPrevencion ≠ SIN_ACCESO.
+ *   - 'tecnica'    → nivelTecnica ≠ SIN_ACCESO.
+ *   - 'admin'      → Administrador (TOTAL en ambas áreas) — config de núcleo.
+ *
+ * Mientras `/me` no resuelve no se muestra ningún item (evita destello de menú).
  */
+
+type Requisito = 'nucleo' | 'prevencion' | 'tecnica' | 'admin'
 
 interface NavItem {
   title: string
   href: string
   icon: React.ComponentType<{ className?: string }>
+  requiere: Requisito
 }
 
 const NAV: NavItem[] = [
-  { title: 'Obras', href: '/obras', icon: House },
-  { title: 'Formularios', href: '/formularios', icon: ClipboardCheck },
-  { title: 'Categorías', href: '/formularios/categorias', icon: FolderTree },
-  { title: 'Hallazgos', href: '/hallazgos', icon: Flag },
-  { title: 'Niveles de riesgo', href: '/prevencion/niveles-riesgo', icon: ShieldAlert },
-  { title: 'Tipos de hallazgo', href: '/tecnica/tipos-hallazgo', icon: ListChecks },
-  { title: 'Etapas constructivas', href: '/tecnica/etapas-constructivas', icon: Layers },
-  { title: 'Etapas de nido', href: '/tecnica/etapas-nido', icon: Boxes },
-  { title: 'Analítica', href: '/analitica', icon: BarChart },
-  { title: 'Biblioteca', href: '/biblioteca', icon: Folder },
-  { title: 'Usuarios', href: '/usuarios', icon: Users },
-  { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard },
-  { title: 'Asignaciones', href: '/usuarios/asignaciones', icon: Link2 },
+  { title: 'Obras', href: '/obras', icon: House, requiere: 'nucleo' },
+  { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: 'nucleo' },
+  { title: 'Categorías', href: '/formularios/categorias', icon: FolderTree, requiere: 'nucleo' },
+  { title: 'Hallazgos', href: '/hallazgos', icon: Flag, requiere: 'prevencion' },
+  { title: 'Niveles de riesgo', href: '/prevencion/niveles-riesgo', icon: ShieldAlert, requiere: 'prevencion' },
+  { title: 'Tipos de hallazgo', href: '/tecnica/tipos-hallazgo', icon: ListChecks, requiere: 'tecnica' },
+  { title: 'Etapas constructivas', href: '/tecnica/etapas-constructivas', icon: Layers, requiere: 'tecnica' },
+  { title: 'Etapas de nido', href: '/tecnica/etapas-nido', icon: Boxes, requiere: 'tecnica' },
+  { title: 'Analítica', href: '/analitica', icon: BarChart, requiere: 'nucleo' },
+  { title: 'Biblioteca', href: '/biblioteca', icon: Folder, requiere: 'nucleo' },
+  { title: 'Usuarios', href: '/usuarios', icon: Users, requiere: 'admin' },
+  { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard, requiere: 'admin' },
+  { title: 'Asignaciones', href: '/usuarios/asignaciones', icon: Link2, requiere: 'admin' },
 ]
+
+/** ¿El usuario (con sus niveles por área) puede ver este item? Sin `/me`, nada. */
+function puedeVer(requiere: Requisito, me: Me | undefined): boolean {
+  if (!me) return false // hasta resolver /me no se muestra ningún item (FAD-001)
+  const { nivelPrevencion, nivelTecnica } = me.perfil
+  if (requiere === 'nucleo') return nivelPrevencion !== 'SIN_ACCESO' || nivelTecnica !== 'SIN_ACCESO'
+  if (requiere === 'prevencion') return nivelPrevencion !== 'SIN_ACCESO'
+  if (requiere === 'tecnica') return nivelTecnica !== 'SIN_ACCESO'
+  return nivelPrevencion === 'TOTAL' && nivelTecnica === 'TOTAL' // admin
+}
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -100,12 +118,15 @@ export function AppSidebar() {
       <nav className="mt-2 flex-1 px-3">
         <ul className="space-y-1">
           {(() => {
+            // Filtra por nivel de Área del perfil (visibilidad del sidebar).
+            const visibles = NAV.filter((i) => puedeVer(i.requiere, me))
             // El prefijo coincidente más específico es el único activo (evita que
             // "Usuarios" y "Perfiles" se marquen a la vez).
-            const activo = NAV.map((i) => i.href)
+            const activo = visibles
+              .map((i) => i.href)
               .filter((h) => pathname === h || pathname.startsWith(h + '/'))
               .sort((a, b) => b.length - a.length)[0]
-            return NAV.map((item) => {
+            return visibles.map((item) => {
             const isActive = item.href === activo
             return (
               <li key={item.href}>

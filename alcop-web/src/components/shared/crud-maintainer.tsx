@@ -89,8 +89,13 @@ export interface CrudMaintainerProps<T extends { id: string | number }, TForm ex
   toFormValues?: (row: T) => DefaultValues<TForm>
   /** Etiqueta de la fila en el diálogo de borrado (default: row.nombre ?? #id). */
   rowLabel?: (row: T) => string
-  /** Oculta Nuevo/editar/eliminar si es false (solo lectura). Default true. */
-  puedeEditar?: boolean
+  /**
+   * Habilita editar/eliminar por fila (solo lectura si es false). Default true.
+   * Acepta una función `(row) => boolean` para gatear por el área/estado de cada fila.
+   */
+  puedeEditar?: boolean | ((row: T) => boolean)
+  /** Muestra el botón "Nuevo". Default: el valor booleano de puedeEditar, o false si es función. */
+  puedeCrear?: boolean
   emptyMessage?: string
   searchPlaceholder?: string
   limit?: number
@@ -110,10 +115,16 @@ export function CrudMaintainer<T extends { id: string | number }, TForm extends 
   toFormValues,
   rowLabel,
   puedeEditar = true,
+  puedeCrear,
   emptyMessage = 'Sin registros.',
   searchPlaceholder = 'Buscar…',
   limit = 20,
 }: CrudMaintainerProps<T, TForm>) {
+  // Edición por fila; "Nuevo" según puedeCrear (default = puedeEditar si es booleano).
+  const editableGeneral = puedeEditar !== false
+  const puedeEditarFila = (row: T) =>
+    typeof puedeEditar === 'function' ? puedeEditar(row) : puedeEditar
+  const mostrarNuevo = puedeCrear ?? (typeof puedeEditar === 'boolean' ? puedeEditar : false)
   const queryClient = useQueryClient()
   const [q, setQ] = useState('')
   const [qDebounced, setQDebounced] = useState('')
@@ -185,35 +196,39 @@ export function CrudMaintainer<T extends { id: string | number }, TForm extends 
   const guardando = crearMutation.isPending || actualizarMutation.isPending
 
   const columnasFinales = useMemo<CrudColumn<T>[]>(() => {
-    if (!puedeEditar) return columns
+    if (!editableGeneral) return columns
     return [
       ...columns,
       {
         key: '__acciones',
         header: '',
-        render: (row: T) => (
-          <div className="flex justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Editar"
-              onClick={() => setDialog({ mode: 'editar', row })}
-            >
-              <Pencil />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Eliminar"
-              className="text-destructive hover:text-destructive"
-              onClick={() => setEliminando(row)}
-            >
-              <Trash2 />
-            </Button>
-          </div>
-        ),
+        // Acciones por fila: una fila que el usuario no puede editar (p. ej.
+        // categoría de un área sin TOTAL) no muestra botones.
+        render: (row: T) =>
+          puedeEditarFila(row) ? (
+            <div className="flex justify-end gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Editar"
+                onClick={() => setDialog({ mode: 'editar', row })}
+              >
+                <Pencil />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Eliminar"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setEliminando(row)}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          ) : null,
       },
     ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columns, puedeEditar])
 
   return (
@@ -223,7 +238,7 @@ export function CrudMaintainer<T extends { id: string | number }, TForm extends 
           <h1 className="text-2xl font-bold text-foreground">{titulo}</h1>
           {descripcion ? <p className="text-sm text-muted-foreground">{descripcion}</p> : null}
         </div>
-        {puedeEditar ? (
+        {mostrarNuevo ? (
           <Button
             size="lg"
             className="font-semibold"
