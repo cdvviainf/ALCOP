@@ -17,7 +17,6 @@ import {
   IdCard,
   LayoutDashboard,
   Layers,
-  Link2,
   ListChecks,
   LogOut,
   ShieldAlert,
@@ -122,8 +121,9 @@ const NAV: Seccion[] = [
     items: [
       { title: 'Usuarios', href: '/usuarios', icon: Users, requiere: 'admin' },
       { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard, requiere: 'admin' },
+      // Obras reemplaza a "Asignaciones": el mantenedor de Obra absorberá la
+      // asignación de titulares cuando se cierre Docs/nucleo-compartido.md.
       { title: 'Obras', href: '/obras', icon: Building2, requiere: 'anyTotal' },
-      { title: 'Asignaciones', href: '/usuarios/asignaciones', icon: Link2, requiere: 'admin' },
     ],
   },
 ]
