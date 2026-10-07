@@ -1,5 +1,5 @@
 import 'dotenv/config' // carga .env para DATABASE_URL / BETTER_AUTH_* al correr standalone
-import { NivelAcceso } from '@prisma/client'
+import { FuncionArea, NivelAcceso } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { auth } from '../lib/auth.js'
 import { env } from '../config/env.js'
@@ -27,27 +27,88 @@ async function seedAreas() {
   return { prevencion, tecnica }
 }
 
+const FUNCIONES: Array<{ codigo: string; nombre: string; area: FuncionArea; orden: number }> = [
+  { codigo: 'OBRAS', nombre: 'Obras', area: FuncionArea.TRANSVERSAL, orden: 1 },
+  { codigo: 'PREV_INSPECCION', nombre: 'Inspección Prevención', area: FuncionArea.PREVENCION, orden: 1 },
+  { codigo: 'PREV_FORMULARIOS', nombre: 'Formularios', area: FuncionArea.PREVENCION, orden: 2 },
+  { codigo: 'PREV_ANALISIS_IA', nombre: 'Análisis IA', area: FuncionArea.PREVENCION, orden: 3 },
+  { codigo: 'PREV_REPORTES', nombre: 'Reportes', area: FuncionArea.PREVENCION, orden: 4 },
+  { codigo: 'PREV_CAT_CATEGORIAS', nombre: 'Categorías', area: FuncionArea.PREVENCION, orden: 5 },
+  { codigo: 'PREV_CAT_NIVEL_RIESGO', nombre: 'Nivel de Riesgo', area: FuncionArea.PREVENCION, orden: 6 },
+  { codigo: 'TEC_INSPECCION', nombre: 'Inspección Técnica', area: FuncionArea.TECNICA, orden: 1 },
+  { codigo: 'TEC_FORMULARIOS', nombre: 'Formularios', area: FuncionArea.TECNICA, orden: 2 },
+  { codigo: 'TEC_ANALISIS_IA', nombre: 'Análisis IA', area: FuncionArea.TECNICA, orden: 3 },
+  { codigo: 'TEC_REPORTES', nombre: 'Reportes', area: FuncionArea.TECNICA, orden: 4 },
+  { codigo: 'TEC_CAT_CATEGORIAS', nombre: 'Categorías', area: FuncionArea.TECNICA, orden: 5 },
+  { codigo: 'TEC_CAT_TIPOS_HALLAZGO', nombre: 'Tipos de Hallazgo', area: FuncionArea.TECNICA, orden: 6 },
+  { codigo: 'TEC_CAT_ETAPAS_CONSTRUCTIVAS', nombre: 'Etapas Constructivas', area: FuncionArea.TECNICA, orden: 7 },
+  { codigo: 'TEC_CAT_ETAPAS_NIDO', nombre: 'Etapas de Nido', area: FuncionArea.TECNICA, orden: 8 },
+]
+
+async function seedFunciones() {
+  for (const f of FUNCIONES) {
+    await prisma.funcion.upsert({
+      where: { codigo: f.codigo },
+      update: { nombre: f.nombre, area: f.area, orden: f.orden },
+      create: f,
+    })
+  }
+}
+
+/** Mayor de dos niveles (SIN_ACCESO < LECTURA < TOTAL). */
+function mayorNivel(a: NivelAcceso, b: NivelAcceso): NivelAcceso {
+  if (a === NivelAcceso.TOTAL || b === NivelAcceso.TOTAL) return NivelAcceso.TOTAL
+  if (a === NivelAcceso.LECTURA || b === NivelAcceso.LECTURA) return NivelAcceso.LECTURA
+  return NivelAcceso.SIN_ACCESO
+}
+
 async function seedPerfiles() {
-  // Perfil.nombre NO es @unique → find-or-create manual para idempotencia.
-  // Niveles exactos de Docs/usuarios-perfiles.md §6 (Prevención, luego Técnica).
-  const perfiles: Array<{ nombre: string; nivelPrevencion: NivelAcceso; nivelTecnica: NivelAcceso }> = [
-    { nombre: 'Administrador', nivelPrevencion: NivelAcceso.TOTAL, nivelTecnica: NivelAcceso.TOTAL },
-    { nombre: 'Jefe Prevencionista', nivelPrevencion: NivelAcceso.TOTAL, nivelTecnica: NivelAcceso.SIN_ACCESO },
-    { nombre: 'Supervisor de obra', nivelPrevencion: NivelAcceso.TOTAL, nivelTecnica: NivelAcceso.TOTAL },
-    { nombre: 'Prevencionista de obra', nivelPrevencion: NivelAcceso.TOTAL, nivelTecnica: NivelAcceso.SIN_ACCESO },
-    { nombre: 'Jefe de terreno', nivelPrevencion: NivelAcceso.SIN_ACCESO, nivelTecnica: NivelAcceso.TOTAL },
-    { nombre: 'Trabajador', nivelPrevencion: NivelAcceso.LECTURA, nivelTecnica: NivelAcceso.SIN_ACCESO },
+  // Modelo granular (v2): cada perfil se mapea desde un nivel por área al nuevo
+  // esquema (área on/off + un permiso por función). Idempotente por nombre.
+  const S = NivelAcceso.SIN_ACCESO
+  const L = NivelAcceso.LECTURA
+  const T = NivelAcceso.TOTAL
+  const perfiles: Array<{ nombre: string; prev: NivelAcceso; tec: NivelAcceso }> = [
+    { nombre: 'Administrador', prev: T, tec: T },
+    { nombre: 'Jefe Prevencionista', prev: T, tec: S },
+    { nombre: 'Supervisor de obra', prev: T, tec: T },
+    { nombre: 'Prevencionista de obra', prev: T, tec: S },
+    { nombre: 'Jefe de terreno', prev: S, tec: T },
+    { nombre: 'Trabajador', prev: L, tec: S },
   ]
 
+  const funciones = await prisma.funcion.findMany({ select: { id: true, area: true } })
+
   for (const p of perfiles) {
+    const obras = mayorNivel(p.prev, p.tec)
+    const nivelPara = (area: FuncionArea): NivelAcceso =>
+      area === FuncionArea.PREVENCION ? p.prev : area === FuncionArea.TECNICA ? p.tec : obras
+
     const existente = await prisma.perfil.findFirst({ where: { nombre: p.nombre, eliminadoEn: null } })
-    if (existente) {
-      await prisma.perfil.update({
-        where: { id: existente.id },
-        data: { nivelPrevencion: p.nivelPrevencion, nivelTecnica: p.nivelTecnica },
+    if (!existente) {
+      // Alta: inicializa toggles + la matriz completa de permisos del seed.
+      await prisma.perfil.create({
+        data: {
+          nombre: p.nombre,
+          areaPrevencion: p.prev !== S,
+          areaTecnica: p.tec !== S,
+          permisos: { create: funciones.map((f) => ({ funcionId: f.id, nivel: nivelPara(f.area) })) },
+        },
       })
     } else {
-      await prisma.perfil.create({ data: p })
+      // Existente: NO se sobreescribe lo administrado desde la app (toggles ni
+      // niveles). Solo se agregan funciones nuevas que falten, en SIN_ACCESO (PG-005).
+      const yaTiene = new Set(
+        (await prisma.perfilPermiso.findMany({ where: { perfilId: existente.id }, select: { funcionId: true } })).map(
+          (x) => x.funcionId
+        )
+      )
+      const faltantes = funciones.filter((f) => !yaTiene.has(f.id))
+      if (faltantes.length > 0) {
+        await prisma.perfilPermiso.createMany({
+          data: faltantes.map((f) => ({ perfilId: existente.id, funcionId: f.id, nivel: NivelAcceso.SIN_ACCESO })),
+        })
+      }
     }
   }
 }
@@ -229,7 +290,7 @@ async function seedAdmin() {
   if (usuarioExistente) {
     await prisma.usuario.update({
       where: { id: usuarioExistente.id },
-      data: { authUserId: authUser.id, perfilId: perfil.id, activo: true },
+      data: { authUserId: authUser.id, perfilId: perfil.id, activo: true, esAdmin: true },
     })
   } else {
     await prisma.usuario.create({
@@ -237,6 +298,7 @@ async function seedAdmin() {
         nombre: ADMIN_NOMBRE,
         email: ADMIN_EMAIL,
         perfilId: perfil.id,
+        esAdmin: true,
         authUserId: authUser.id,
         activo: true,
         creadoPor: 'seed',
@@ -248,6 +310,7 @@ async function seedAdmin() {
 
 async function main() {
   const { prevencion, tecnica } = await seedAreas()
+  await seedFunciones()
   await seedPerfiles()
   await seedCategorias(prevencion.id, tecnica.id)
   await seedNivelesRiesgo()
@@ -263,7 +326,7 @@ async function main() {
     console.warn('⚠️  Seed de admin falló (no bloquea el arranque):', (err as Error).message)
   }
   console.log(
-    '✅ Seed completado: 2 Areas, 6 Perfiles, 11 Categorías, 4 Niveles de riesgo, ' +
+    '✅ Seed completado: 2 Areas, 15 Funciones, 6 Perfiles, 11 Categorías, 4 Niveles de riesgo, ' +
       '3 Tipos de hallazgo, 5 Etapas constructivas, 6 Etapas de nido, 4 Obras.'
   )
 }

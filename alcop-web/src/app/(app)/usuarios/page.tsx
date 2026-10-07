@@ -23,7 +23,8 @@ interface Usuario extends Record<string, unknown> {
   nombre: string
   email: string
   activo: boolean
-  perfil: { id: number; nombre: string }
+  esAdmin: boolean
+  perfil: { id: number; nombre: string } | null
   creadoEn: string
 }
 
@@ -33,7 +34,8 @@ const schema = z.object({
   nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
   email: z.string().trim().email('Email inválido').optional().or(z.literal('')),
   password: z.string().min(8, 'Mínimo 8 caracteres').optional().or(z.literal('')),
-  perfilId: z.coerce.number().int().positive('Selecciona un perfil'),
+  esAdmin: z.boolean(),
+  perfilId: z.coerce.number().int().positive().optional(),
   activo: z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
@@ -41,7 +43,18 @@ type FormValues = z.infer<typeof schema>
 const columns: CrudColumn<Usuario>[] = [
   { key: 'nombre', header: 'Nombre', render: (row) => <span className="font-medium">{row.nombre}</span> },
   { key: 'email', header: 'Email', render: (row) => <span className="text-muted-foreground">{row.email}</span> },
-  { key: 'perfil', header: 'Perfil', render: (row) => <span className="text-muted-foreground">{row.perfil.nombre}</span> },
+  {
+    key: 'perfil',
+    header: 'Perfil',
+    render: (row) =>
+      row.esAdmin ? (
+        <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-primary">
+          ADMINISTRADOR
+        </span>
+      ) : (
+        <span className="text-muted-foreground">{row.perfil?.nombre ?? '—'}</span>
+      ),
+  },
   {
     key: 'activo',
     header: 'Estado',
@@ -92,16 +105,30 @@ export default function UsuariosPage() {
                 description: 'Mínimo 8 caracteres.',
                 soloAlta: true,
               },
+              {
+                name: 'esAdmin',
+                label: 'Administrador (acceso total)',
+                type: 'checkbox',
+                description: 'Si se marca, el perfil se ignora.',
+              },
               { name: 'perfilId', label: 'Perfil', type: 'select', options: perfilOptions },
               { name: 'activo', label: 'Activo', type: 'checkbox' },
             ]}
             schema={schema}
-            defaultValues={{ nombre: '', email: '', password: '', perfilId: perfiles[0]?.id ?? 0, activo: true }}
+            defaultValues={{
+              nombre: '',
+              email: '',
+              password: '',
+              esAdmin: false,
+              perfilId: perfiles[0]?.id ?? 0,
+              activo: true,
+            }}
             toFormValues={(row) => ({
               nombre: row.nombre,
               email: row.email,
               password: '',
-              perfilId: row.perfil.id,
+              esAdmin: row.esAdmin,
+              perfilId: row.perfil?.id ?? perfiles[0]?.id ?? 0,
               activo: row.activo,
             })}
             rowLabel={(row) => row.nombre}

@@ -47,23 +47,24 @@ interface Me {
   id: string
   nombre: string
   email: string
-  perfil: { id: number; nombre: string; nivelPrevencion: string; nivelTecnica: string }
+  esAdmin: boolean
+  perfil: { id: number; nombre: string } | null
+  permisos: Record<string, string>
 }
 
 /**
  * Sidebar oscuro de ALCOP TERRENO, en secciones con grupos anidados colapsables.
  *
- * Visibilidad por Área (CLAUDE.md §11, usuarios-perfiles.md §6, alcop-esquema.html §05):
- * cada hoja declara `requiere` y se filtra según los niveles del perfil del usuario
- * (GET /api/usuarios/me). Un grupo/sección se muestra si tiene al menos una hoja visible.
- * Mientras `/me` no resuelve no se muestra ningún item.
- *   - 'nucleo'   → ≥ LECTURA en al menos un área.
- *   - 'prevencion'/'tecnica' → nivel del área ≠ SIN_ACCESO.
- *   - 'anyTotal' → TOTAL en al menos un área.
- *   - 'admin'    → TOTAL en ambas áreas.
+ * Visibilidad (modelo granular v2, usuarios-perfiles.md §6): cada hoja declara
+ * `requiere` y se filtra según el acceso del usuario (GET /api/usuarios/me):
+ *   - 'always' → cualquier usuario autenticado.
+ *   - 'admin'  → esAdmin.
+ *   - string[] → códigos de función: visible si esAdmin o alguno ≥ LECTURA.
+ * Un grupo/sección se muestra si tiene al menos una hoja visible. Mientras `/me`
+ * no resuelve no se muestra ningún item.
  */
 
-type Requisito = 'nucleo' | 'prevencion' | 'tecnica' | 'anyTotal' | 'admin'
+type Requisito = 'always' | 'admin' | string[]
 type Icono = React.ComponentType<{ className?: string }>
 
 interface Hoja {
@@ -91,20 +92,20 @@ function esHoja(n: Nodo): n is Hoja {
 const NAV: Seccion[] = [
   {
     seccion: 'Inicio',
-    items: [{ title: 'Dashboard', href: '/', icon: LayoutDashboard, requiere: 'nucleo' }],
+    items: [{ title: 'Dashboard', href: '/', icon: LayoutDashboard, requiere: 'always' }],
   },
   {
     seccion: 'Registro',
     items: [
-      { title: 'Inspección Técnica', href: '/registro/inspeccion-tecnica', icon: HardHat, requiere: 'tecnica' },
-      { title: 'Inspección Prevención', href: '/registro/inspeccion-prevencion', icon: ShieldCheck, requiere: 'prevencion' },
+      { title: 'Inspección Técnica', href: '/registro/inspeccion-tecnica', icon: HardHat, requiere: ['TEC_INSPECCION'] },
+      { title: 'Inspección Prevención', href: '/registro/inspeccion-prevencion', icon: ShieldCheck, requiere: ['PREV_INSPECCION'] },
     ],
   },
   {
     seccion: 'Configuración',
     items: [
-      { title: 'Obras', href: '/obras', icon: Building2, requiere: 'admin' },
-      { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: 'nucleo' },
+      { title: 'Obras', href: '/obras', icon: Building2, requiere: ['OBRAS'] },
+      { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: ['PREV_FORMULARIOS', 'TEC_FORMULARIOS'] },
       {
         title: 'Datos Maestros',
         icon: Database,
@@ -113,18 +114,18 @@ const NAV: Seccion[] = [
             title: 'Técnicos',
             icon: Wrench,
             children: [
-              { title: 'Categorías', href: '/formularios/categorias/tecnica', icon: FolderTree, requiere: 'tecnica' },
-              { title: 'Tipos Hallazgo', href: '/tecnica/tipos-hallazgo', icon: ListChecks, requiere: 'tecnica' },
-              { title: 'Etapas Constructivas', href: '/tecnica/etapas-constructivas', icon: Layers, requiere: 'tecnica' },
-              { title: 'Etapas de Nido', href: '/tecnica/etapas-nido', icon: Boxes, requiere: 'tecnica' },
+              { title: 'Categorías', href: '/formularios/categorias/tecnica', icon: FolderTree, requiere: ['TEC_CAT_CATEGORIAS'] },
+              { title: 'Tipos Hallazgo', href: '/tecnica/tipos-hallazgo', icon: ListChecks, requiere: ['TEC_CAT_TIPOS_HALLAZGO'] },
+              { title: 'Etapas Constructivas', href: '/tecnica/etapas-constructivas', icon: Layers, requiere: ['TEC_CAT_ETAPAS_CONSTRUCTIVAS'] },
+              { title: 'Etapas de Nido', href: '/tecnica/etapas-nido', icon: Boxes, requiere: ['TEC_CAT_ETAPAS_NIDO'] },
             ],
           },
           {
             title: 'Prevención',
             icon: ShieldAlert,
             children: [
-              { title: 'Categorías', href: '/formularios/categorias/prevencion', icon: FolderTree, requiere: 'prevencion' },
-              { title: 'Nivel de Riesgo', href: '/prevencion/niveles-riesgo', icon: Gauge, requiere: 'prevencion' },
+              { title: 'Categorías', href: '/formularios/categorias/prevencion', icon: FolderTree, requiere: ['PREV_CAT_CATEGORIAS'] },
+              { title: 'Nivel de Riesgo', href: '/prevencion/niveles-riesgo', icon: Gauge, requiere: ['PREV_CAT_NIVEL_RIESGO'] },
             ],
           },
         ],
@@ -149,20 +150,10 @@ function iniciales(nombre: string): string {
 
 function cumpleNivel(req: Requisito, me: Me | undefined): boolean {
   if (!me) return false
-  const p = me.perfil.nivelPrevencion
-  const t = me.perfil.nivelTecnica
-  switch (req) {
-    case 'nucleo':
-      return p !== 'SIN_ACCESO' || t !== 'SIN_ACCESO'
-    case 'prevencion':
-      return p !== 'SIN_ACCESO'
-    case 'tecnica':
-      return t !== 'SIN_ACCESO'
-    case 'anyTotal':
-      return p === 'TOTAL' || t === 'TOTAL'
-    case 'admin':
-      return p === 'TOTAL' && t === 'TOTAL'
-  }
+  if (req === 'always') return true
+  if (req === 'admin') return me.esAdmin
+  if (me.esAdmin) return true
+  return req.some((codigo) => (me.permisos[codigo] ?? 'SIN_ACCESO') !== 'SIN_ACCESO')
 }
 
 function nodoVisible(n: Nodo, me: Me | undefined): boolean {
@@ -311,7 +302,9 @@ export function AppSidebar() {
           </span>
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-sm font-semibold text-white">{me?.nombre ?? '—'}</div>
-            <div className="truncate text-xs text-panel-muted">{me?.perfil.nombre ?? ''}</div>
+            <div className="truncate text-xs text-panel-muted">
+              {me?.esAdmin ? 'Administrador' : (me?.perfil?.nombre ?? '')}
+            </div>
           </div>
           <button
             type="button"

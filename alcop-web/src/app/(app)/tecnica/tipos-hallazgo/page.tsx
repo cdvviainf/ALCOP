@@ -9,7 +9,8 @@ import { BreadcrumbBar } from '@/components/layout/top-bar'
 import { CrudMaintainer, type CrudColumn } from '@/components/shared/crud-maintainer'
 
 interface Me {
-  perfil: { nivelPrevencion: string; nivelTecnica: string }
+  esAdmin: boolean
+  permisos: Record<string, string>
 }
 
 interface TipoHallazgo extends Record<string, unknown> {
@@ -55,7 +56,7 @@ export default function TiposHallazgoPage() {
     retry: false,
   })
 
-  const puedeEditar = me?.perfil.nivelTecnica === 'TOTAL'
+  const puedeEditar = me?.esAdmin === true || me?.permisos?.['TEC_CAT_TIPOS_HALLAZGO'] === 'TOTAL'
 
   return (
     <>

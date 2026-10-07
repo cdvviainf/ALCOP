@@ -1,3 +1,4 @@
+import type { NivelAcceso } from '@prisma/client'
 import { auth } from '../../lib/auth.js'
 import { ConflictError, NotFoundError } from '../../shared/errors.js'
 import { paginate } from '../../shared/pagination.js'
@@ -14,13 +15,9 @@ type FilaConPerfil = {
   nombre: string
   email: string
   activo: boolean
+  esAdmin: boolean
   creadoEn: Date
-  perfil: {
-    id: number
-    nombre: string
-    nivelPrevencion: UsuarioDTO['perfil']['nivelPrevencion']
-    nivelTecnica: UsuarioDTO['perfil']['nivelTecnica']
-  }
+  perfil: { id: number; nombre: string } | null
 }
 
 function toDTO(u: FilaConPerfil): UsuarioDTO {
@@ -29,37 +26,43 @@ function toDTO(u: FilaConPerfil): UsuarioDTO {
     nombre: u.nombre,
     email: u.email,
     activo: u.activo,
-    perfil: {
-      id: u.perfil.id,
-      nombre: u.perfil.nombre,
-      nivelPrevencion: u.perfil.nivelPrevencion,
-      nivelTecnica: u.perfil.nivelTecnica,
-    },
+    esAdmin: u.esAdmin,
+    perfil: u.perfil ? { id: u.perfil.id, nombre: u.perfil.nombre } : null,
     creadoEn: u.creadoEn.toISOString(),
   }
 }
 
-/** Hash de la credencial con el esquema de Better Auth. No es una query Prisma. */
 async function hashPassword(password: string): Promise<string> {
   const ctx = await auth.$context
   return ctx.password.hash(password)
 }
 
 export const usuariosService = {
-  /** Perfil del usuario de la sesión (alimenta sidebar y visibilidad por área). */
+  /**
+   * Perfil del usuario de la sesión: esAdmin + mapa de permisos efectivos por
+   * función (ya aplicando los toggles de área). Alimenta sidebar y gating del front.
+   */
   async obtenerMe(usuarioId: string) {
-    const usuario = await usuariosRepository.obtenerConPerfil(usuarioId)
-    if (!usuario) throw new NotFoundError('Usuario', usuarioId)
+    const u = await usuariosRepository.obtenerParaSesion(usuarioId)
+    if (!u) throw new NotFoundError('Usuario', usuarioId)
+
+    const permisos: Record<string, NivelAcceso> = {}
+    if (u.perfil) {
+      for (const p of u.perfil.permisos) {
+        const apagada =
+          (p.funcion.area === 'PREVENCION' && !u.perfil.areaPrevencion) ||
+          (p.funcion.area === 'TECNICA' && !u.perfil.areaTecnica)
+        permisos[p.funcion.codigo] = apagada ? 'SIN_ACCESO' : p.nivel
+      }
+    }
+
     return {
-      id: usuario.id,
-      nombre: usuario.nombre,
-      email: usuario.email,
-      perfil: {
-        id: usuario.perfil.id,
-        nombre: usuario.perfil.nombre,
-        nivelPrevencion: usuario.perfil.nivelPrevencion,
-        nivelTecnica: usuario.perfil.nivelTecnica,
-      },
+      id: u.id,
+      nombre: u.nombre,
+      email: u.email,
+      esAdmin: u.esAdmin,
+      perfil: u.perfil ? { id: u.perfil.id, nombre: u.perfil.nombre } : null,
+      permisos,
     }
   },
 
@@ -74,14 +77,13 @@ export const usuariosService = {
     return toDTO(usuario)
   },
 
-  /**
-   * Alta de usuario (la hace un Administrador; registro público off). El hash se
-   * calcula acá (no es query) y el repository persiste identidad Better Auth +
-   * Usuario de dominio en una sola transacción (QA-C-002).
-   */
   async crear(data: CrearUsuarioInput, creadoPor: string): Promise<UsuarioDTO> {
-    const perfil = await perfilesRepository.buscarPorId(data.perfilId)
-    if (!perfil) throw new NotFoundError('Perfil', String(data.perfilId))
+    const esAdmin = data.esAdmin === true
+    const perfilId = data.perfilId ?? null
+    if (perfilId != null) {
+      const perfil = await perfilesRepository.buscarPorId(perfilId)
+      if (!perfil) throw new NotFoundError('Perfil', String(perfilId))
+    }
 
     if (await usuariosRepository.buscarPorEmail(data.email)) {
       throw new ConflictError(`Ya existe un usuario con el email ${data.email}.`)
@@ -91,7 +93,8 @@ export const usuariosService = {
     const usuario = await usuariosRepository.crearConCredencial({
       nombre: data.nombre,
       email: data.email,
-      perfilId: data.perfilId,
+      esAdmin,
+      perfilId, // un no-admin ya trae perfil (lo exige el schema)
       passwordHash,
       creadoPor,
     })
@@ -102,7 +105,12 @@ export const usuariosService = {
     const existente = await usuariosRepository.buscarPorId(id)
     if (!existente) throw new NotFoundError('Usuario', id)
 
-    if (data.perfilId !== undefined) {
+    const esAdminFinal = data.esAdmin !== undefined ? data.esAdmin : existente.esAdmin
+    const perfilIdFinal = data.perfilId !== undefined ? data.perfilId : existente.perfilId
+    if (!esAdminFinal && perfilIdFinal == null) {
+      throw new ConflictError('Un usuario no administrador requiere un perfil.')
+    }
+    if (data.perfilId != null) {
       const perfil = await perfilesRepository.buscarPorId(data.perfilId)
       if (!perfil) throw new NotFoundError('Perfil', String(data.perfilId))
     }
@@ -117,6 +125,7 @@ export const usuariosService = {
 
     const usuario = await usuariosRepository.actualizar(id, {
       nombre: data.nombre,
+      esAdmin: data.esAdmin,
       perfilId: data.perfilId,
       activo: data.activo,
       passwordHash,
@@ -126,13 +135,9 @@ export const usuariosService = {
   },
 
   /**
-   * Retira a un usuario. Regla de usuarios-perfiles.md §7: si tiene revisiones en
-   * los últimos 90 días NO se elimina — "se desactiva (activo=false) en su lugar"
-   * (QA-C-003: el sistema hace la desactivación, no la delega al operador). Si no,
-   * se soft-deletea. En ambos casos se quitan sus asignaciones de obra (QA-C-004).
-   *
-   * NOTA: hoy "revisiones" solo cuenta RespuestaFormulario; cuando existan los
-   * módulos de Hallazgos y Visitas habrá que sumarlos (ver prevencion.md/tecnica.md).
+   * Retira a un usuario (usuarios-perfiles.md §7): si tiene revisiones en los
+   * últimos 90 días se desactiva; si no, se soft-deletea. Siempre quita sus
+   * asignaciones de obra.
    */
   async eliminar(id: string, solicitanteId: string): Promise<'eliminado' | 'desactivado'> {
     const existente = await usuariosRepository.buscarPorId(id)

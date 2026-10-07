@@ -4,17 +4,31 @@ import { prisma } from '../../lib/prisma.js'
 import type { PaginationQuery } from '../../shared/pagination.js'
 import { toPrismaRange } from '../../shared/pagination.js'
 
-const perfilSelect = {
-  select: { id: true, nombre: true, nivelPrevencion: true, nivelTecnica: true },
-} as const
+const perfilSelect = { select: { id: true, nombre: true } } as const
 
 /** Acceso a datos de Usuario (CLAUDE.md §12.2). */
 export const usuariosRepository = {
-  /** Usuario activo + su perfil, por id de dominio. Solo campos no sensibles. */
-  async obtenerConPerfil(id: string) {
+  /** Usuario de la sesión + perfil con permisos efectivos (para /me). */
+  async obtenerParaSesion(id: string) {
     return prisma.usuario.findFirst({
       where: { id, eliminadoEn: null, activo: true },
-      select: { id: true, nombre: true, email: true, perfil: perfilSelect },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        esAdmin: true,
+        perfil: {
+          select: {
+            id: true,
+            nombre: true,
+            areaPrevencion: true,
+            areaTecnica: true,
+            permisos: {
+              select: { nivel: true, funcion: { select: { codigo: true, area: true } } },
+            },
+          },
+        },
+      },
     })
   },
 
@@ -51,17 +65,11 @@ export const usuariosRepository = {
     })
   },
 
-  /** ¿El email ya está en uso por algún Usuario (incluye soft-deleted, por el @unique)? */
   async buscarPorEmail(email: string) {
     return prisma.usuario.findUnique({ where: { email }, select: { id: true } })
   },
 
-  /** Fija la credencial `credential` del usuario Better Auth dentro de una tx. */
-  async _fijarCredencial(
-    tx: Prisma.TransactionClient,
-    authUserId: string,
-    passwordHash: string
-  ) {
+  async _fijarCredencial(tx: Prisma.TransactionClient, authUserId: string, passwordHash: string) {
     const cuenta = await tx.account.findFirst({
       where: { userId: authUserId, providerId: 'credential' },
       select: { id: true },
@@ -81,16 +89,12 @@ export const usuariosRepository = {
     }
   },
 
-  /**
-   * Alta atómica (QA-C-002): identidad Better Auth (auth_user + auth_account
-   * credential) + Usuario de dominio en una sola transacción Prisma. Si algo
-   * falla, rollback total — nunca quedan identidades huérfanas. El hash lo
-   * calcula el service (no es query); acá solo persistimos (CLAUDE.md §12.2/§12.3).
-   */
+  /** Alta atómica: identidad Better Auth + Usuario de dominio (QA-C-002). */
   async crearConCredencial(data: {
     nombre: string
     email: string
-    perfilId: number
+    esAdmin: boolean
+    perfilId: number | null
     passwordHash: string
     creadoPor: string
   }) {
@@ -106,6 +110,7 @@ export const usuariosRepository = {
         data: {
           nombre: data.nombre,
           email: data.email,
+          esAdmin: data.esAdmin,
           perfilId: data.perfilId,
           authUserId: authUser.id,
           activo: true,
@@ -116,12 +121,12 @@ export const usuariosRepository = {
     })
   },
 
-  /** Actualización atómica: credencial (si se resetea) + Usuario, con rollback conjunto. */
   async actualizar(
     id: string,
     data: {
       nombre?: string
-      perfilId?: number
+      esAdmin?: boolean
+      perfilId?: number | null
       activo?: boolean
       passwordHash?: string
       authUserId?: string | null
@@ -135,6 +140,7 @@ export const usuariosRepository = {
         where: { id },
         data: {
           ...(data.nombre !== undefined ? { nombre: data.nombre } : {}),
+          ...(data.esAdmin !== undefined ? { esAdmin: data.esAdmin } : {}),
           ...(data.perfilId !== undefined ? { perfilId: data.perfilId } : {}),
           ...(data.activo !== undefined ? { activo: data.activo } : {}),
         },
@@ -143,15 +149,8 @@ export const usuariosRepository = {
     })
   },
 
-  /**
-   * Retira a un usuario del servicio en una transacción (CLAUDE.md §12.3):
-   * siempre borra sus asignaciones `UsuarioObra` (ya no puede ser titular — QA-C-004)
-   * y, según `eliminar`, lo soft-deletea o solo lo desactiva (QA-C-003).
-   */
   async retirar(id: string, eliminar: boolean, eliminadoPor: string) {
     return prisma.$transaction(async (tx) => {
-      // Soft-delete de las asignaciones (UsuarioObra es registro de negocio —
-      // nunca DELETE físico, CLAUDE.md §12.7 / nucleo-compartido.md §6, OBR-002).
       await tx.usuarioObra.updateMany({
         where: { usuarioId: id, eliminadoEn: null },
         data: { eliminadoEn: new Date(), eliminadoPor },
@@ -163,7 +162,6 @@ export const usuariosRepository = {
     })
   },
 
-  /** Respuestas de formulario registradas por el usuario desde `desde` (guard de 90 días). */
   async contarRespuestasDesde(usuarioId: string, desde: Date) {
     return prisma.respuestaFormulario.count({ where: { usuarioId, fechaHora: { gte: desde } } })
   },

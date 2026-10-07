@@ -9,7 +9,8 @@ import { BreadcrumbBar } from '@/components/layout/top-bar'
 import { CrudMaintainer, type CrudColumn } from '@/components/shared/crud-maintainer'
 
 interface Me {
-  perfil: { nivelPrevencion: string; nivelTecnica: string }
+  esAdmin: boolean
+  permisos: Record<string, string>
 }
 
 interface NivelRiesgo extends Record<string, unknown> {
@@ -60,7 +61,7 @@ export default function NivelesRiesgoPage() {
     retry: false,
   })
 
-  const puedeEditar = me?.perfil.nivelPrevencion === 'TOTAL'
+  const puedeEditar = me?.esAdmin === true || me?.permisos?.['PREV_CAT_NIVEL_RIESGO'] === 'TOTAL'
 
   return (
     <>

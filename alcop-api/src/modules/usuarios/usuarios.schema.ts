@@ -10,18 +10,26 @@ export const usuarioIdParamSchema = z.object({
   id: z.string().trim().min(1),
 })
 
-export const crearUsuarioSchema = z.object({
-  nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
-  email: z.string().trim().toLowerCase().email('Email inválido'),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-  perfilId: z.coerce.number().int().positive(),
-})
+export const crearUsuarioSchema = z
+  .object({
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+    email: z.string().trim().toLowerCase().email('Email inválido'),
+    password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+    esAdmin: z.boolean().optional(),
+    perfilId: z.coerce.number().int().positive().nullable().optional(),
+  })
+  // Un usuario no-administrador debe tener perfil (el admin lo ignora).
+  .refine((d) => d.esAdmin === true || d.perfilId != null, {
+    message: 'Un usuario no administrador requiere un perfil.',
+    path: ['perfilId'],
+  })
 
-// El email NO es editable (es el login del usuario — decisión 06-10-2026).
+// El email NO es editable (es el login del usuario).
 export const actualizarUsuarioSchema = z
   .object({
     nombre: z.string().trim().min(1).optional(),
-    perfilId: z.coerce.number().int().positive().optional(),
+    esAdmin: z.boolean().optional(),
+    perfilId: z.coerce.number().int().positive().nullable().optional(),
     activo: z.boolean().optional(),
     password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').optional(),
   })

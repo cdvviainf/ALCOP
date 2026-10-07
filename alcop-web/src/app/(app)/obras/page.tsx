@@ -14,7 +14,8 @@ import {
 } from '@/components/shared/crud-maintainer'
 
 interface Me {
-  perfil: { nivelPrevencion: string; nivelTecnica: string }
+  esAdmin: boolean
+  permisos: Record<string, string>
 }
 
 interface Obra extends Record<string, unknown> {
@@ -101,7 +102,7 @@ export default function ObrasPage() {
     queryFn: () => api.get('usuarios/me').json<Me>(),
     retry: false,
   })
-  const esAdmin = me?.perfil.nivelPrevencion === 'TOTAL' && me?.perfil.nivelTecnica === 'TOTAL'
+  const puedeEditar = me?.esAdmin === true || me?.permisos?.['OBRAS'] === 'TOTAL'
 
   return (
     <>
@@ -151,7 +152,7 @@ export default function ObrasPage() {
               fechaTerminoEstimada: fechaInput(row.fechaTerminoEstimada),
             })}
             rowLabel={(row) => row.nombre}
-            puedeEditar={esAdmin}
+            puedeEditar={puedeEditar}
             searchPlaceholder="Buscar por nombre o código…"
             emptyMessage="No hay obras."
           />

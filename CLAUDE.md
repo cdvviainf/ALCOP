@@ -11,11 +11,13 @@
 >
 > **Metodología spec-first (igual que en FAS):** antes de implementar cada módulo se escribe su spec en `Docs/<modulo>.md` con todas las reglas de negocio, modelo de datos y casos borde resueltos vía preguntas y respuestas con Christian. Hasta que un spec esté cerrado, cualquier detalle no definido en `alcop-esquema.html` se pregunta — nunca se inventa.
 >
-> **Specs cerrados (04-10-2026):** `usuarios-perfiles.md` (perfil con nivel de acceso por Área, no por ítem de menú individual — más simple que el modelo de FAS) y `formularios-dinamicos.md` (motor de formularios 100% dinámico: Formulario → Pregunta con `tipoRespuesta` [Checkbox/Selección múltiple/Número/Texto/Texto largo], obligatoria/opcional, foto opcional por pregunta, permisos por usuario vía `FormularioPermiso`). Ambos superseden cualquier mención anterior de "ItemMenu" para ALCOP — ese patrón de FAS no aplica aquí, es más simple.
+> **ACTUALIZACIÓN (07-10-2026) — modelo de accesos GRANULAR (v2):** se revirtió la decisión "nivel por Área". Ahora el Perfil define **un nivel por Función** (SIN_ACCESO/LECTURA/TOTAL) dentro de cada Área (encendible con un toggle Sí/No), más la función transversal **Obras**; y el `Usuario` tiene un flag **`esAdmin`** que da acceso TOTAL a todo (bypassa el perfil). Modelo: `Funcion` + `PerfilPermiso` + toggles de área (ver `Docs/usuarios-perfiles.md` v2). Autorización backend por `requirePermiso(funcion, nivel)` / `requireAdmin` (esAdmin); sidebar y gating desde el mapa de permisos de `GET /api/usuarios/me`. Esto supersede todas las menciones de "nivel por Área" de abajo.
+
+> **Specs cerrados (04-10-2026):** `usuarios-perfiles.md` (ver actualización granular de arriba) y `formularios-dinamicos.md` (motor de formularios 100% dinámico: Formulario → Pregunta con `tipoRespuesta` [Checkbox/Selección múltiple/Número/Texto/Texto largo], obligatoria/opcional, foto opcional por pregunta, permisos por usuario vía `FormularioPermiso`). Ambos superseden cualquier mención anterior de "ItemMenu" para ALCOP — ese patrón de FAS no aplica aquí, es más simple.
 >
 > **Convenciones canónicas (iguales a FAS/IFK):**
 > - **IDs:** `id Int @id @default(autoincrement())` en todas las tablas.
-> - **Autorización:** por **perfil + ítem de menú + nivel** (`SIN_ACCESO`/`LECTURA`/`TOTAL`), no por rol fijo — ver sección 08 de `alcop-esquema.html` y el spec `Docs/usuarios-perfiles.md`.
+> - **Autorización:** por **perfil + función + nivel** (`SIN_ACCESO`/`LECTURA`/`TOTAL`) + flag `esAdmin`, no por rol fijo (modelo granular v2) — ver sección 08 de `alcop-esquema.html` y el spec `Docs/usuarios-perfiles.md`.
 > - **Prefijo de API:** `/api/<módulo>` (sin versión). Ej.: `/api/nucleo`, `/api/prevencion`, `/api/tecnica`.
 > - **Frontend:** route group `(app)` bajo `src/app/` (ej. `src/app/(app)/prevencion`).
 > - **Naming de dominio:** español (`codigo`, `descripcion`, `creadoEn`, `creadoPor`, `eliminadoEn`...).
@@ -31,7 +33,7 @@ Stack real del scaffold (04-10-2026): **Next.js 16 App Router (Turbopack), React
 Reglas de adaptación (obligatorias):
 1. AUTH: Better Auth contra alcop-api (hoy el login es placeholder; `lib/auth-client.ts` es stub hasta cablear el backend).
 2. DATA FETCHING: TanStack Query + ky contra alcop-api (ver `lib/api.ts`). No introducir otra capa de fetching.
-3. NAVEGACIÓN: sidebar construido desde los **niveles por área del Perfil** (`nivelPrevencion`/`nivelTecnica` vía `GET /api/usuarios/me`), respetando LECTURA / TOTAL y la regla de visibilidad de la sección 05 de `alcop-esquema.html` (usuario con ambas áreas ve Prevención + Técnica; usuario de un área ve solo la suya). **No hay ItemMenu ni endpoint `/menu`** — ALCOP usa nivel por Área, no ítems de menú (ver §11 y `Docs/usuarios-perfiles.md`). Hoy el sidebar es estático con las secciones canónicas; el filtrado por nivel se cablea al integrar auth.
+3. NAVEGACIÓN: sidebar construido desde el **mapa de permisos por función del Perfil** (`esAdmin` + `permisos` vía `GET /api/usuarios/me`), respetando LECTURA / TOTAL por función y los toggles de área. `esAdmin` ve todo. No hay endpoint `/menu`: la visibilidad se arma en el cliente desde `/me` (ver §11 y `Docs/usuarios-perfiles.md` v2).
 4. Mantener el proyecto limpio: sin módulos de demo (kanban, e-commerce, etc.).
 
 Convenciones conservadas: tablas server-side (search/filter/paginación) con TanStack, formularios React Hook Form + Zod, theming por CSS variables (remarcar a identidad ALCOP).
@@ -204,7 +206,7 @@ alcop-web/
 ### Convenciones
 - **IDs:** `id Int @id @default(autoincrement())` en todas las tablas.
 - **Auditoría (naming español):** `creadoEn`/`creadoPor`, `actualizadoEn`/`actualizadoPor`, `eliminadoEn`/`eliminadoPor` (soft delete).
-- **Autorización:** perfil + ítem de menú + nivel (no roles fijos).
+- **Autorización:** perfil + función + nivel, o `esAdmin` (acceso total). No roles fijos (modelo granular v2 — ver usuarios-perfiles.md).
 
 ### Schema Prisma — mapa de modelos (a especificar en `Docs/`)
 
@@ -212,7 +214,7 @@ alcop-web/
 |---|---|---|
 | `00-entorno-general.md` | Borrador inicial | Convenciones transversales, visibilidad por perfil |
 | `00-mantenedores-requeridos.md` | **Cerrado** | Listado consolidado de catálogos (Area, CategoriaFormulario, NivelRiesgo, EtapaNido, RolObra, etc.) |
-| `usuarios-perfiles.md` | **Cerrado** | Area, Usuario, Perfil (nivel por área), UsuarioObra |
+| `usuarios-perfiles.md` | **Cerrado (v2 granular)** | Area, Usuario (esAdmin), Perfil + Funcion + PerfilPermiso, UsuarioObra |
 | `formularios-dinamicos.md` | **Cerrado** | CategoriaFormulario, Formulario, Pregunta, RespuestaFormulario, RespuestaPregunta, FormularioPermiso |
 | `nucleo-compartido.md` | Pendiente de spec | Obra, PanelResumen |
 | `prevencion.md` | Pendiente de spec | Hallazgo, VisitaPrevencion, AnalisisIA |
@@ -228,7 +230,7 @@ alcop-web/
 ## 6. API REST — Convenciones
 
 - **Prefijo:** `/api/<módulo>` (sin versión). Ej.: `/api/nucleo`, `/api/prevencion`, `/api/tecnica`, `/api/reportes`.
-- **Auth:** sesión Better Auth; autorización por perfil + ítem de menú + nivel.
+- **Auth:** sesión Better Auth; autorización por perfil + función + nivel (o `esAdmin`).
 - **Paginación:** `?page=1&limit=20` → `{ data, meta: { total, page, limit, totalPages } }`.
 - **Errores:** `{ error: { code, message, details? } }`.
 - **Fechas:** ISO 8601.
@@ -322,7 +324,7 @@ Ver `docker-compose.yml` en la raíz del proyecto (PostgreSQL 17, Redis 7, pgAdm
 - Stack técnico alineado al de FAS (Node/Fastify/Prisma/PostgreSQL + Next.js/shadcn) para reutilizar convenciones, tooling y agentes de desarrollo ya rodados en VIAIN.
 - Costos de hosting/VPS y de API de IA corren por cuenta de ALCOP, fuera de la propuesta (sección 11 de alcop-esquema.html) — igual que las suscripciones Google Play / Apple Developer para la Etapa 2.
 - Proveedor de IA aún no elegido — se parte con `AI_PROVIDER=mock` y adaptador genérico, igual que el patrón de adaptador DTE de FAS.
-- Modelo de accesos simplificado respecto a FAS: `Perfil` tiene nivel de acceso por Área (Prevención/Técnica), no un sistema de `ItemMenu` granular — no se justifica la complejidad para 2 áreas.
+- **Modelo de accesos GRANULAR (07-10-2026, v2):** `Perfil` tiene un nivel (SIN_ACCESO/LECTURA/TOTAL) por **Función** dentro de cada Área (toggle Sí/No por área) + la función transversal **Obras**; `Usuario.esAdmin` = acceso total (bypassa el perfil). Reemplaza el modelo previo de "un nivel por Área" (`nivelPrevencion`/`nivelTecnica`), que queda obsoleto. Tablas: `Funcion`, `PerfilPermiso`. Guards: `requirePermiso(funcion, nivel)` y `requireAdmin` (esAdmin).
 - Formularios 100% dinámicos desde la Etapa 1 (no hay formularios hardcodeados en código): tipos de respuesta Checkbox, Selección múltiple, Número, Texto, Texto largo; foto opcional por pregunta; permisos de ver/editar por usuario además del nivel de área.
 - Definición técnica de la Etapa 2 (App móvil) puesta en stand by el 04-10-2026 — foco 100% en Etapa 1 por ahora.
 - Reglas de acceso y permisos cerradas el 04-10-2026: "Jefe Prevencionista" queda `SIN_ACCESO` en Técnica (difiere de la redacción "ambas" de alcop-esquema.html §08); `FormularioPermiso` solo amplía acceso, nunca lo niega; `CategoriaFormulario` es 100% dinámico, sin lista cerrada previa.

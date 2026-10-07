@@ -126,10 +126,14 @@ export const obrasRepository = {
     })
   },
 
-  async buscarUsuarioConNiveles(usuarioId: string) {
+  async buscarUsuarioParaTitular(usuarioId: string) {
     return prisma.usuario.findFirst({
       where: { id: usuarioId, eliminadoEn: null, activo: true },
-      select: { id: true, perfil: { select: { nivelPrevencion: true, nivelTecnica: true } } },
+      select: {
+        id: true,
+        esAdmin: true,
+        perfil: { select: { areaPrevencion: true, areaTecnica: true } },
+      },
     })
   },
 }

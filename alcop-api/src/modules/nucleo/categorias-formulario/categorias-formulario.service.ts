@@ -7,7 +7,13 @@ import { categoriasRepository } from './categorias-formulario.repository.js'
 import type { ActualizarCategoriaInput, CrearCategoriaInput } from './categorias-formulario.schema.js'
 import type { CategoriaFormularioDTO } from './categorias-formulario.types.js'
 
-export type NivelesPorArea = { PREVENCION: NivelAcceso; TECNICA: NivelAcceso } | undefined
+/** Acceso del solicitante: admin (bypass) o mapa de permisos efectivos por función. */
+export type Acceso = { esAdmin?: boolean; permisos?: Record<string, NivelAcceso> }
+
+const CAT_FUNCION: Record<string, string> = {
+  PREVENCION: 'PREV_CAT_CATEGORIAS',
+  TECNICA: 'TEC_CAT_CATEGORIAS',
+}
 
 type FilaConArea = {
   id: number
@@ -34,16 +40,20 @@ function toDTO(row: FilaConArea): CategoriaFormularioDTO {
   }
 }
 
+/** Nivel efectivo del solicitante sobre la función Categorías del área dada. */
+function nivelCategoriasDeArea(acceso: Acceso, areaCodigo: string): NivelAcceso {
+  if (acceso.esAdmin) return 'TOTAL'
+  const codigo = CAT_FUNCION[areaCodigo]
+  return (codigo ? acceso.permisos?.[codigo] : undefined) ?? 'SIN_ACCESO'
+}
+
 /**
- * Autorización dinámica (formularios-dinamicos.md §2, confirmado 06-10-2026):
- * mutar una categoría exige nivel TOTAL en el Área de esa categoría — NO ser
- * administrador total. El área sale del dato (areaId del body al crear, o de la
- * categoría existente al editar/borrar), por eso se valida acá y no en un
- * preHandler estático.
+ * Autorización dinámica (formularios-dinamicos.md §2): mutar una categoría exige
+ * nivel TOTAL en la función Categorías del Área de esa categoría. El área sale del
+ * dato (areaId del body al crear, o de la categoría existente al editar/borrar).
  */
-function exigirTotalEnArea(niveles: NivelesPorArea, areaCodigo: string) {
-  const codigo = areaCodigo as 'PREVENCION' | 'TECNICA'
-  if (niveles?.[codigo] !== 'TOTAL') {
+function exigirTotalEnArea(acceso: Acceso, areaCodigo: string) {
+  if (nivelCategoriasDeArea(acceso, areaCodigo) !== 'TOTAL') {
     throw new ForbiddenError(
       `Se requiere acceso total en el área ${areaCodigo} para administrar sus categorías.`
     )
@@ -53,35 +63,34 @@ function exigirTotalEnArea(niveles: NivelesPorArea, areaCodigo: string) {
 export const categoriasService = {
   async listar(
     pagination: PaginationQuery,
-    niveles: NivelesPorArea,
+    acceso: Acceso,
     q?: string,
     areaId?: number
   ): Promise<Paginated<CategoriaFormularioDTO>> {
     // Solo las áreas donde el solicitante tiene acceso (≥ LECTURA). Un usuario de
     // una sola área ve únicamente sus categorías (usuarios-perfiles.md §5/§6).
     const codigosArea = (['PREVENCION', 'TECNICA'] as const).filter(
-      (c) => (niveles?.[c] ?? 'SIN_ACCESO') !== 'SIN_ACCESO'
+      (c) => nivelCategoriasDeArea(acceso, c) !== 'SIN_ACCESO'
     )
     const { rows, total } = await categoriasRepository.listar(pagination, q, areaId, codigosArea)
     return paginate(rows.map(toDTO), total, pagination)
   },
 
-  async obtener(id: number, niveles: NivelesPorArea): Promise<CategoriaFormularioDTO> {
+  async obtener(id: number, acceso: Acceso): Promise<CategoriaFormularioDTO> {
     const row = await categoriasRepository.buscarPorId(id)
     if (!row) throw new NotFoundError('Categoría de formulario', String(id))
     // Visibilidad por área (FAD-003): si el solicitante no tiene acceso al área de
     // la categoría, se responde 404 (no se revela que existe en otra área).
-    const codigo = row.area.codigo as 'PREVENCION' | 'TECNICA'
-    if ((niveles?.[codigo] ?? 'SIN_ACCESO') === 'SIN_ACCESO') {
+    if (nivelCategoriasDeArea(acceso, row.area.codigo) === 'SIN_ACCESO') {
       throw new NotFoundError('Categoría de formulario', String(id))
     }
     return toDTO(row)
   },
 
-  async crear(data: CrearCategoriaInput, niveles: NivelesPorArea, usuarioId: string): Promise<CategoriaFormularioDTO> {
+  async crear(data: CrearCategoriaInput, acceso: Acceso, usuarioId: string): Promise<CategoriaFormularioDTO> {
     const area = await categoriasRepository.buscarArea(data.areaId)
     if (!area) throw new NotFoundError('Área', String(data.areaId))
-    exigirTotalEnArea(niveles, area.codigo)
+    exigirTotalEnArea(acceso, area.codigo)
 
     const codigo = slugCodigo(data.nombre)
     if (await categoriasRepository.existeCodigoEnArea(data.areaId, codigo)) {
@@ -101,11 +110,11 @@ export const categoriasService = {
   async actualizar(
     id: number,
     data: ActualizarCategoriaInput,
-    niveles: NivelesPorArea
+    acceso: Acceso
   ): Promise<CategoriaFormularioDTO> {
     const existente = await categoriasRepository.buscarPorId(id)
     if (!existente) throw new NotFoundError('Categoría de formulario', String(id))
-    exigirTotalEnArea(niveles, existente.area.codigo)
+    exigirTotalEnArea(acceso, existente.area.codigo)
 
     // Si cambia el nombre, se regenera el codigo y se revalida unicidad en el área.
     let codigo: string | undefined
@@ -120,10 +129,10 @@ export const categoriasService = {
     return toDTO(row)
   },
 
-  async eliminar(id: number, niveles: NivelesPorArea, usuarioId: string): Promise<void> {
+  async eliminar(id: number, acceso: Acceso, usuarioId: string): Promise<void> {
     const existente = await categoriasRepository.buscarPorId(id)
     if (!existente) throw new NotFoundError('Categoría de formulario', String(id))
-    exigirTotalEnArea(niveles, existente.area.codigo)
+    exigirTotalEnArea(acceso, existente.area.codigo)
 
     const formularios = await categoriasRepository.contarFormularios(id)
     if (formularios > 0) {

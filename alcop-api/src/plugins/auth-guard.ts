@@ -4,22 +4,22 @@ import { fromNodeHeaders } from 'better-auth/node'
 import { auth } from '../lib/auth.js'
 import { prisma } from '../lib/prisma.js'
 
-export type Area = 'PREVENCION' | 'TECNICA'
-
 declare module 'fastify' {
   interface FastifyRequest {
     // Usuario de dominio resuelto por requireAuth (id String — cuid).
     usuarioId?: string
-    perfilId?: number
-    // Niveles del perfil por área (autorización ALCOP: por área, no ItemMenu).
-    niveles?: { PREVENCION: NivelAcceso; TECNICA: NivelAcceso }
+    // Administrador transversal: acceso TOTAL a todo (bypassa el perfil).
+    esAdmin?: boolean
+    // Nivel efectivo por función (codigo → nivel), ya aplicando los toggles de
+    // área del perfil. Vacío para esAdmin (requirePermiso lo bypassa).
+    permisos?: Record<string, NivelAcceso>
   }
 }
 
 /**
  * Verifica sesión activa (Better Auth) y carga el Usuario de dominio enlazado
- * por `authUserId`, su perfil y los niveles por área. Un Usuario soft-deleted o
- * inactivo no pasa (401). Adjunta `usuarioId`, `perfilId` y `niveles` al request.
+ * por `authUserId`, su flag `esAdmin` y el mapa de permisos efectivos por función
+ * (Docs/usuarios-perfiles.md §6 v2). Un Usuario soft-deleted o inactivo no pasa.
  */
 export const requireAuth: preHandlerHookHandler = async (request, reply) => {
   const session = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) })
@@ -32,8 +32,16 @@ export const requireAuth: preHandlerHookHandler = async (request, reply) => {
     where: { authUserId: session.user.id, eliminadoEn: null, activo: true },
     select: {
       id: true,
-      perfilId: true,
-      perfil: { select: { nivelPrevencion: true, nivelTecnica: true } },
+      esAdmin: true,
+      perfil: {
+        select: {
+          areaPrevencion: true,
+          areaTecnica: true,
+          permisos: {
+            select: { nivel: true, funcion: { select: { codigo: true, area: true } } },
+          },
+        },
+      },
     },
   })
 
@@ -42,12 +50,21 @@ export const requireAuth: preHandlerHookHandler = async (request, reply) => {
     return
   }
 
-  request.usuarioId = usuario.id
-  request.perfilId = usuario.perfilId
-  request.niveles = {
-    PREVENCION: usuario.perfil.nivelPrevencion,
-    TECNICA: usuario.perfil.nivelTecnica,
+  const permisos: Record<string, NivelAcceso> = {}
+  if (usuario.perfil) {
+    for (const p of usuario.perfil.permisos) {
+      // Si el Área de la función está apagada en el perfil, el nivel efectivo
+      // es SIN_ACCESO sin importar el valor guardado.
+      const apagada =
+        (p.funcion.area === 'PREVENCION' && !usuario.perfil.areaPrevencion) ||
+        (p.funcion.area === 'TECNICA' && !usuario.perfil.areaTecnica)
+      permisos[p.funcion.codigo] = apagada ? 'SIN_ACCESO' : p.nivel
+    }
   }
+
+  request.usuarioId = usuario.id
+  request.esAdmin = usuario.esAdmin
+  request.permisos = permisos
 }
 
 function cumple(nivel: NivelAcceso | undefined, min: 'LECTURA' | 'TOTAL'): boolean {
@@ -56,49 +73,31 @@ function cumple(nivel: NivelAcceso | undefined, min: 'LECTURA' | 'TOTAL'): boole
 }
 
 /**
- * Nivel mínimo para un área concreta. Usar después de requireAuth: lee
- * `request.niveles` sin ir a la BD.
+ * Exige un nivel mínimo sobre una función concreta. Usar después de requireAuth.
+ * Los administradores (`esAdmin`) pasan siempre.
  */
-export function requireArea(area: Area, min: 'LECTURA' | 'TOTAL'): preHandlerHookHandler {
+export function requirePermiso(codigo: string, min: 'LECTURA' | 'TOTAL'): preHandlerHookHandler {
   return async (request, reply) => {
-    if (!cumple(request.niveles?.[area], min)) {
-      const mensaje =
-        min === 'TOTAL'
-          ? 'Se requiere acceso total para esta operación.'
-          : 'No tiene acceso a esta función.'
-      reply.status(403).send({ error: { code: 'FORBIDDEN', message: mensaje } })
+    if (request.esAdmin) return
+    if (!cumple(request.permisos?.[codigo], min)) {
+      reply.status(403).send({
+        error: {
+          code: 'FORBIDDEN',
+          message:
+            min === 'TOTAL'
+              ? 'Se requiere acceso total para esta operación.'
+              : 'No tiene acceso a esta función.',
+        },
+      })
     }
   }
 }
 
-/**
- * Como requireArea, pero satisfecho si el nivel mínimo se cumple en CUALQUIER
- * área (Prevención o Técnica).
- */
-export function requireAnyArea(min: 'LECTURA' | 'TOTAL'): preHandlerHookHandler {
-  return async (request, reply) => {
-    const ok = cumple(request.niveles?.PREVENCION, min) || cumple(request.niveles?.TECNICA, min)
-    if (!ok) {
-      const mensaje =
-        min === 'TOTAL'
-          ? 'Se requiere acceso total para esta operación.'
-          : 'No tiene acceso a esta función.'
-      reply.status(403).send({ error: { code: 'FORBIDDEN', message: mensaje } })
-    }
-  }
-}
-
-/**
- * Acceso de Administrador: nivel TOTAL en AMBAS áreas (Prevención y Técnica).
- * Es la puerta de la configuración de núcleo (Perfil, Usuario, UsuarioObra,
- * CategoriaFormulario) — ver Docs/plan-mantenedores.md §0 (decisión 06-10-2026).
- * Usar después de requireAuth: lee `request.niveles` sin ir a la BD.
- */
+/** Exige ser Administrador transversal (`esAdmin`). Config de Accesos. */
 export const requireAdmin: preHandlerHookHandler = async (request, reply) => {
-  const ok = cumple(request.niveles?.PREVENCION, 'TOTAL') && cumple(request.niveles?.TECNICA, 'TOTAL')
-  if (!ok) {
+  if (!request.esAdmin) {
     reply
       .status(403)
-      .send({ error: { code: 'FORBIDDEN', message: 'Se requiere acceso de administrador.' } })
+      .send({ error: { code: 'FORBIDDEN', message: 'Se requiere ser administrador.' } })
   }
 }

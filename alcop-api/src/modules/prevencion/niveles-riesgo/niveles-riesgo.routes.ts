@@ -1,5 +1,5 @@
 import { prisma } from '../../../lib/prisma.js'
-import { requireArea, requireAuth } from '../../../plugins/auth-guard.js'
+import { requireAuth, requirePermiso } from '../../../plugins/auth-guard.js'
 import { crearCatalogoRoutes, type CatalogoDelegate } from '../../../shared/catalogo.factory.js'
 import { slugCodigo } from '../../../shared/slug.js'
 import { actualizarNivelRiesgoSchema, crearNivelRiesgoSchema } from './niveles-riesgo.schema.js'
@@ -28,7 +28,7 @@ export default crearCatalogoRoutes({
     creadoEn: (row.creadoEn as Date).toISOString(),
   }),
   authz: {
-    leer: [requireAuth],
-    escribir: [requireAuth, requireArea('PREVENCION', 'TOTAL')],
+    leer: [requireAuth, requirePermiso('PREV_CAT_NIVEL_RIESGO', 'LECTURA')],
+    escribir: [requireAuth, requirePermiso('PREV_CAT_NIVEL_RIESGO', 'TOTAL')],
   },
 })

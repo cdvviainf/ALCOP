@@ -5,16 +5,17 @@
 export type NivelAcceso = 'SIN_ACCESO' | 'LECTURA' | 'TOTAL'
 
 /**
- * Usuario autenticado tal como lo devolverá GET /api/usuarios/me.
- * El sidebar se filtra con nivelPrevencion / nivelTecnica — NO existe
- * un endpoint /menu ni el patrón ItemMenu de FAS en ALCOP.
+ * Usuario autenticado tal como lo devuelve GET /api/usuarios/me (modelo v2).
+ * El acceso es granular: `esAdmin` (bypass total) + un mapa de permisos efectivos
+ * por función (codigo → nivel). El sidebar y el gating se construyen desde ahí.
  */
 export interface UsuarioActual {
-  id: number
+  id: string
   nombre: string
   email: string
-  nivelPrevencion: NivelAcceso
-  nivelTecnica: NivelAcceso
+  esAdmin: boolean
+  perfil: { id: number; nombre: string } | null
+  permisos: Record<string, NivelAcceso>
 }
 
 /** Envoltorio estándar de respuestas paginadas de la API. */

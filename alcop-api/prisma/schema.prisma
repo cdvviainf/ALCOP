@@ -120,8 +120,10 @@ model Usuario {
   nombre      String
   email       String   @unique
   activo      Boolean  @default(true)
-  perfilId    Int
-  perfil      Perfil   @relation(fields: [perfilId], references: [id])
+  // Administrador transversal (acceso TOTAL a todo; el perfil se ignora).
+  esAdmin     Boolean  @default(false)
+  perfilId    Int?
+  perfil      Perfil?  @relation(fields: [perfilId], references: [id])
   obras       UsuarioObra[]
   respuestas  RespuestaFormulario[]
   permisos    FormularioPermiso[]
@@ -130,14 +132,45 @@ model Usuario {
   eliminadoEn DateTime?
 }
 
+// Modelo de accesos granular (Docs/usuarios-perfiles.md §4/§6, v2 07-10-2026).
 model Perfil {
-  id              Int         @id @default(autoincrement())
-  nombre          String
-  nivelPrevencion NivelAcceso @default(SIN_ACCESO)
-  nivelTecnica    NivelAcceso @default(SIN_ACCESO)
-  usuarios        Usuario[]
-  creadoEn        DateTime    @default(now())
-  eliminadoEn     DateTime?
+  id             Int             @id @default(autoincrement())
+  nombre         String
+  areaPrevencion Boolean         @default(false)
+  areaTecnica    Boolean         @default(false)
+  permisos       PerfilPermiso[]
+  usuarios       Usuario[]
+  creadoEn       DateTime        @default(now())
+  eliminadoEn    DateTime?
+}
+
+enum FuncionArea {
+  TRANSVERSAL
+  PREVENCION
+  TECNICA
+}
+
+// Catálogo de funciones/mantenedores controlables por perfil.
+model Funcion {
+  id       Int             @id @default(autoincrement())
+  codigo   String          @unique
+  nombre   String
+  area     FuncionArea
+  orden    Int             @default(0)
+  permisos PerfilPermiso[]
+}
+
+// Nivel de un Perfil sobre una Función. Si el Área está apagada en el perfil, el
+// nivel efectivo es SIN_ACCESO (se resuelve en la autorización, no acá).
+model PerfilPermiso {
+  id        Int         @id @default(autoincrement())
+  perfilId  Int
+  perfil    Perfil      @relation(fields: [perfilId], references: [id])
+  funcionId Int
+  funcion   Funcion     @relation(fields: [funcionId], references: [id])
+  nivel     NivelAcceso @default(SIN_ACCESO)
+
+  @@unique([perfilId, funcionId])
 }
 
 // Asignación de titulares de obra (nucleo-compartido.md §4). Varios usuarios por

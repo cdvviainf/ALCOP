@@ -1,95 +1,191 @@
 'use client'
 
-import { z } from 'zod'
+import { useState } from 'react'
+import Link from 'next/link'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 
+import { api } from '@/lib/api'
 import { cn } from 'cn'
+import { Button } from '@/components/ui/button'
 import { BreadcrumbBar } from '@/components/layout/top-bar'
 import {
-  CrudMaintainer,
-  type CrudColumn,
-  type CrudFieldOption,
-} from '@/components/shared/crud-maintainer'
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
-interface Perfil extends Record<string, unknown> {
+interface Perfil {
   id: number
   nombre: string
-  nivelPrevencion: string
-  nivelTecnica: string
+  areaPrevencion: boolean
+  areaTecnica: boolean
   usuariosActivos: number
-  creadoEn: string
 }
 
-const NIVELES: CrudFieldOption[] = [
-  { value: 'SIN_ACCESO', label: 'Sin acceso' },
-  { value: 'LECTURA', label: 'Lectura' },
-  { value: 'TOTAL', label: 'Total' },
-]
-
-const schema = z.object({
-  nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
-  nivelPrevencion: z.enum(['SIN_ACCESO', 'LECTURA', 'TOTAL']),
-  nivelTecnica: z.enum(['SIN_ACCESO', 'LECTURA', 'TOTAL']),
-})
-type FormValues = z.infer<typeof schema>
-
-function NivelBadge({ nivel }: { nivel: string }) {
-  const label = NIVELES.find((n) => n.value === nivel)?.label ?? nivel
+function AreaBadge({ on }: { on: boolean }) {
   return (
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
-        nivel === 'TOTAL'
-          ? 'bg-ok-bg text-ok-fg'
-          : nivel === 'LECTURA'
-            ? 'bg-secondary text-foreground'
-            : 'bg-warn-bg text-warn-fg'
+        on ? 'bg-ok-bg text-ok-fg' : 'bg-secondary text-muted-foreground'
       )}
     >
-      {label}
+      {on ? 'SÍ' : 'NO'}
     </span>
   )
 }
 
-const columns: CrudColumn<Perfil>[] = [
-  { key: 'nombre', header: 'Perfil', render: (row) => <span className="font-medium">{row.nombre}</span> },
-  { key: 'nivelPrevencion', header: 'Prevención', render: (row) => <NivelBadge nivel={row.nivelPrevencion} /> },
-  { key: 'nivelTecnica', header: 'Técnica', render: (row) => <NivelBadge nivel={row.nivelTecnica} /> },
-  {
-    key: 'usuariosActivos',
-    header: 'Usuarios',
-    render: (row) => <span className="tabular-nums text-muted-foreground">{row.usuariosActivos}</span>,
-  },
-]
-
 export default function PerfilesPage() {
-  // La página la protege requireAdmin en el backend; el front muestra los
-  // controles siempre y el API rechaza (403) si no es administrador.
+  const queryClient = useQueryClient()
+  const [eliminando, setEliminando] = useState<Perfil | null>(null)
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['perfiles'],
+    queryFn: () => api.get('nucleo/perfiles', { searchParams: { limit: '100' } }).json<{ data: Perfil[] }>(),
+  })
+  const perfiles = data?.data ?? []
+
+  const eliminar = useMutation({
+    mutationFn: (id: number) => api.delete(`nucleo/perfiles/${id}`),
+    onSuccess: () => {
+      toast.success('Perfil eliminado.')
+      setEliminando(null)
+      queryClient.invalidateQueries({ queryKey: ['perfiles'] })
+    },
+    onError: (err: Error) => toast.error(err.message || 'No se pudo eliminar.'),
+  })
+
   return (
     <>
-      <BreadcrumbBar backHref="/usuarios" trail="Usuarios" current="Perfiles" />
+      <BreadcrumbBar backHref="/usuarios" trail="Accesos" current="Perfiles" />
       <main className="flex-1 p-8">
-        <CrudMaintainer<Perfil, FormValues>
-          titulo="Perfiles"
-          descripcion="Nivel de acceso por Área. El nivel gobierna quién crea/elimina (TOTAL) vs. solo ve y completa (LECTURA)."
-          endpoint="nucleo/perfiles"
-          queryKey="perfiles"
-          columns={columns}
-          fields={[
-            { name: 'nombre', label: 'Nombre', placeholder: 'Ej. Prevencionista de obra' },
-            { name: 'nivelPrevencion', label: 'Nivel en Prevención', type: 'select', options: NIVELES },
-            { name: 'nivelTecnica', label: 'Nivel en Técnica', type: 'select', options: NIVELES },
-          ]}
-          schema={schema}
-          defaultValues={{ nombre: '', nivelPrevencion: 'SIN_ACCESO', nivelTecnica: 'SIN_ACCESO' }}
-          toFormValues={(row) => ({
-            nombre: row.nombre,
-            nivelPrevencion: row.nivelPrevencion as FormValues['nivelPrevencion'],
-            nivelTecnica: row.nivelTecnica as FormValues['nivelTecnica'],
-          })}
-          searchPlaceholder="Buscar perfil…"
-          emptyMessage="No hay perfiles."
-        />
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold text-foreground">Perfiles</h1>
+            <p className="text-sm text-muted-foreground">
+              Acceso granular por función. Marca el área y asigna el nivel de cada función.
+            </p>
+          </div>
+          <Button size="lg" className="font-semibold" render={<Link href="/usuarios/perfiles/nuevo" />} nativeButton={false}>
+            <Plus strokeWidth={2.5} />
+            Nuevo
+          </Button>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Perfil</TableHead>
+                <TableHead>Prevención</TableHead>
+                <TableHead>Técnica</TableHead>
+                <TableHead>Usuarios</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" />
+                      Cargando…
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ) : isError ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-sm text-destructive">
+                    No se pudieron cargar los perfiles.
+                  </TableCell>
+                </TableRow>
+              ) : perfiles.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    No hay perfiles.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                perfiles.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.nombre}</TableCell>
+                    <TableCell>
+                      <AreaBadge on={p.areaPrevencion} />
+                    </TableCell>
+                    <TableCell>
+                      <AreaBadge on={p.areaTecnica} />
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">{p.usuariosActivos}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Editar"
+                          render={<Link href={`/usuarios/perfiles/${p.id}`} />}
+                          nativeButton={false}
+                        >
+                          <Pencil />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Eliminar"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setEliminando(p)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </main>
+
+      <Dialog open={eliminando !== null} onOpenChange={(open) => (!open ? setEliminando(null) : undefined)}>
+        {eliminando ? (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Eliminar perfil</DialogTitle>
+              <DialogDescription>
+                ¿Seguro que quieres eliminar{' '}
+                <span className="font-semibold text-foreground">{eliminando.nombre}</span>? Esta acción no se
+                puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEliminando(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={eliminar.isPending}
+                onClick={() => eliminar.mutate(eliminando.id)}
+              >
+                {eliminar.isPending ? <Loader2 className="animate-spin" /> : null}
+                Eliminar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </>
   )
 }

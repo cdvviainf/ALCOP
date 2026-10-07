@@ -10,12 +10,12 @@ import { perfilesController } from './perfiles.controller.js'
 export default async function perfilesRoutes(app: FastifyInstance) {
   app.get(
     '/perfiles',
-    { preHandler: [requireAuth], schema: { tags: ['nucleo'], summary: 'Listar perfiles (paginado)' } },
+    { preHandler: [requireAuth, requireAdmin], schema: { tags: ['nucleo'], summary: 'Listar perfiles (paginado)' } },
     perfilesController.listar
   )
   app.get(
     '/perfiles/:id',
-    { preHandler: [requireAuth], schema: { tags: ['nucleo'], summary: 'Detalle de perfil' } },
+    { preHandler: [requireAuth, requireAdmin], schema: { tags: ['nucleo'], summary: 'Detalle de perfil' } },
     perfilesController.obtener
   )
   app.post(

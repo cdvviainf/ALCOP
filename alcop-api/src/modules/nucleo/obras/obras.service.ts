@@ -41,19 +41,24 @@ function esConflictoUnico(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
 }
 
-/** Validación de nivel por rol (usuarios-perfiles.md §7, nucleo-compartido.md §6). */
-function validarNivelParaRol(
+/**
+ * Validación de acceso por rol (usuarios-perfiles.md §7, modelo v2): el titular
+ * de un rol ligado a un área debe tener esa área habilitada en su perfil (o ser
+ * administrador). ADMINISTRADOR no tiene restricción de área.
+ */
+function validarAccesoParaRol(
   rolObra: RolObra,
-  niveles: { nivelPrevencion: string; nivelTecnica: string }
+  usuario: { esAdmin: boolean; perfil: { areaPrevencion: boolean; areaTecnica: boolean } | null }
 ) {
-  if (rolObra === 'PREVENCIONISTA' && niveles.nivelPrevencion === 'SIN_ACCESO') {
+  if (usuario.esAdmin) return
+  if (rolObra === 'PREVENCIONISTA' && !usuario.perfil?.areaPrevencion) {
     throw new BusinessError(
       'NIVEL_INSUFICIENTE',
       'El usuario no tiene acceso a Prevención; no puede ser Prevencionista de la obra.',
       422
     )
   }
-  if (rolObra === 'JEFE_DE_TERRENO' && niveles.nivelTecnica === 'SIN_ACCESO') {
+  if (rolObra === 'JEFE_DE_TERRENO' && !usuario.perfil?.areaTecnica) {
     throw new BusinessError(
       'NIVEL_INSUFICIENTE',
       'El usuario no tiene acceso a Técnica; no puede ser Jefe de Terreno de la obra.',
@@ -136,10 +141,10 @@ export const obrasService = {
     const obra = await obrasRepository.buscarPorId(obraId)
     if (!obra) throw new NotFoundError('Obra', String(obraId))
 
-    const usuario = await obrasRepository.buscarUsuarioConNiveles(data.usuarioId)
+    const usuario = await obrasRepository.buscarUsuarioParaTitular(data.usuarioId)
     if (!usuario) throw new NotFoundError('Usuario', data.usuarioId)
 
-    validarNivelParaRol(data.rolObra, usuario.perfil)
+    validarAccesoParaRol(data.rolObra, usuario)
 
     if (await obrasRepository.existeTitular(obraId, data.rolObra, data.usuarioId)) {
       throw new ConflictError('Ese usuario ya está asignado a ese rol en la obra.')

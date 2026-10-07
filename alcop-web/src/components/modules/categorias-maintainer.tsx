@@ -19,7 +19,8 @@ interface Area {
 }
 
 interface Me {
-  perfil: { nivelPrevencion: string; nivelTecnica: string }
+  esAdmin: boolean
+  permisos: Record<string, string>
 }
 
 interface Categoria extends Record<string, unknown> {
@@ -93,10 +94,11 @@ export function CategoriasMaintainer({ area }: { area?: 'PREVENCION' | 'TECNICA'
   })
 
   const areas = areasResp?.data ?? []
-  const tieneTotal = (codigo: string) =>
-    codigo === 'PREVENCION'
-      ? me?.perfil.nivelPrevencion === 'TOTAL'
-      : me?.perfil.nivelTecnica === 'TOTAL'
+  const tieneTotal = (codigo: string) => {
+    if (me?.esAdmin) return true
+    const funcion = codigo === 'PREVENCION' ? 'PREV_CAT_CATEGORIAS' : 'TEC_CAT_CATEGORIAS'
+    return me?.permisos?.[funcion] === 'TOTAL'
+  }
 
   const areaFija = area ? areas.find((a) => a.codigo === area) : undefined
   // Áreas que el usuario administra (TOTAL); si hay área fija, solo esa.

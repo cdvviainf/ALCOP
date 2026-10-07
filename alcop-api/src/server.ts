@@ -84,6 +84,7 @@ await app.register(import('./modules/health/health.routes.js'))
 await app.register(import('./modules/usuarios/usuarios.routes.js'), { prefix: '/api/usuarios' })
 await app.register(import('./modules/nucleo/obras/obras.routes.js'), { prefix: '/api/nucleo' })
 await app.register(import('./modules/nucleo/areas/areas.routes.js'), { prefix: '/api/nucleo' })
+await app.register(import('./modules/nucleo/funciones/funciones.routes.js'), { prefix: '/api/nucleo' })
 await app.register(import('./modules/nucleo/perfiles/perfiles.routes.js'), { prefix: '/api/nucleo' })
 await app.register(import('./modules/nucleo/categorias-formulario/categorias-formulario.routes.js'), {
   prefix: '/api/nucleo',

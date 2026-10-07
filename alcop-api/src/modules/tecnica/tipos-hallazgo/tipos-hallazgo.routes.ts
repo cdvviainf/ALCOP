@@ -1,5 +1,5 @@
 import { prisma } from '../../../lib/prisma.js'
-import { requireArea, requireAuth } from '../../../plugins/auth-guard.js'
+import { requireAuth, requirePermiso } from '../../../plugins/auth-guard.js'
 import { crearCatalogoRoutes, type CatalogoDelegate } from '../../../shared/catalogo.factory.js'
 import { slugCodigo } from '../../../shared/slug.js'
 import { actualizarTipoHallazgoSchema, crearTipoHallazgoSchema } from './tipos-hallazgo.schema.js'
@@ -27,7 +27,7 @@ export default crearCatalogoRoutes({
     creadoEn: (row.creadoEn as Date).toISOString(),
   }),
   authz: {
-    leer: [requireAuth],
-    escribir: [requireAuth, requireArea('TECNICA', 'TOTAL')],
+    leer: [requireAuth, requirePermiso('TEC_CAT_TIPOS_HALLAZGO', 'LECTURA')],
+    escribir: [requireAuth, requirePermiso('TEC_CAT_TIPOS_HALLAZGO', 'TOTAL')],
   },
 })

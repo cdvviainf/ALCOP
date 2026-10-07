@@ -1,11 +1,18 @@
 import type { NivelAcceso } from '@prisma/client'
 
-/** Representación pública de un Perfil en respuestas de la API. */
+export interface PerfilPermisoDTO {
+  funcionId: number
+  codigo: string
+  nivel: NivelAcceso
+}
+
+/** Representación pública de un Perfil (modelo granular). */
 export interface PerfilDTO {
   id: number
   nombre: string
-  nivelPrevencion: NivelAcceso
-  nivelTecnica: NivelAcceso
+  areaPrevencion: boolean
+  areaTecnica: boolean
+  permisos: PerfilPermisoDTO[]
   usuariosActivos: number
   creadoEn: string
 }
