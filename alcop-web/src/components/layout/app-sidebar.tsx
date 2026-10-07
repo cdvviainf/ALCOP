@@ -15,9 +15,11 @@ import {
   Gauge,
   HardHat,
   IdCard,
+  KeyRound,
   LayoutDashboard,
   Layers,
   ListChecks,
+  Loader2,
   LogOut,
   ShieldAlert,
   ShieldCheck,
@@ -28,6 +30,18 @@ import {
 import { cn } from 'cn'
 import { api } from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface Me {
   id: string
@@ -89,6 +103,7 @@ const NAV: Seccion[] = [
   {
     seccion: 'Configuración',
     items: [
+      { title: 'Obras', href: '/obras', icon: Building2, requiere: 'admin' },
       { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: 'nucleo' },
       {
         title: 'Datos Maestros',
@@ -121,9 +136,8 @@ const NAV: Seccion[] = [
     items: [
       { title: 'Usuarios', href: '/usuarios', icon: Users, requiere: 'admin' },
       { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard, requiere: 'admin' },
-      // Obras reemplaza a "Asignaciones": el mantenedor de Obra absorberá la
-      // asignación de titulares cuando se cierre Docs/nucleo-compartido.md.
-      { title: 'Obras', href: '/obras', icon: Building2, requiere: 'anyTotal' },
+      // Permisos Obra: asociación de usuarios (titulares) por obra.
+      { title: 'Permisos Obra', href: '/obras/permisos', icon: KeyRound, requiere: 'admin' },
     ],
   },
 ]
@@ -171,11 +185,33 @@ export function AppSidebar() {
     retry: false,
   })
   const [colapsados, setColapsados] = useState<Set<string>>(new Set())
+  const [cambioOpen, setCambioOpen] = useState(false)
+  const [actual, setActual] = useState('')
+  const [nueva, setNueva] = useState('')
+  const [guardandoPass, setGuardandoPass] = useState(false)
 
   const handleLogout = async () => {
     await authClient.signOut()
     router.push('/login')
     router.refresh()
+  }
+
+  const handleCambiarPassword = async () => {
+    if (nueva.length < 8) {
+      toast.error('La nueva contraseña debe tener al menos 8 caracteres.')
+      return
+    }
+    setGuardandoPass(true)
+    const { error } = await authClient.changePassword({ currentPassword: actual, newPassword: nueva })
+    setGuardandoPass(false)
+    if (error) {
+      toast.error(error.message || 'No se pudo cambiar la contraseña. Revisa la contraseña actual.')
+      return
+    }
+    toast.success('Contraseña actualizada.')
+    setCambioOpen(false)
+    setActual('')
+    setNueva('')
   }
 
   // Href visible cuyo prefijo calza mejor con la ruta actual → único activo.
@@ -279,6 +315,15 @@ export function AppSidebar() {
           </div>
           <button
             type="button"
+            onClick={() => setCambioOpen(true)}
+            title="Cambiar contraseña"
+            aria-label="Cambiar contraseña"
+            className="rounded-md p-1.5 text-panel-muted transition-colors hover:bg-white/5 hover:text-white"
+          >
+            <KeyRound className="size-[18px]" />
+          </button>
+          <button
+            type="button"
             onClick={handleLogout}
             title="Cerrar sesión"
             aria-label="Cerrar sesión"
@@ -288,6 +333,53 @@ export function AppSidebar() {
           </button>
         </div>
       </div>
+
+      {/* Diálogo de cambio de contraseña del usuario de la sesión */}
+      <Dialog open={cambioOpen} onOpenChange={(open) => (!open ? setCambioOpen(false) : undefined)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar contraseña</DialogTitle>
+            <DialogDescription>Ingresa tu contraseña actual y la nueva (mínimo 8 caracteres).</DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void handleCambiarPassword()
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="pass-actual">Contraseña actual</Label>
+              <Input
+                id="pass-actual"
+                type="password"
+                autoComplete="current-password"
+                value={actual}
+                onChange={(e) => setActual(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pass-nueva">Nueva contraseña</Label>
+              <Input
+                id="pass-nueva"
+                type="password"
+                autoComplete="new-password"
+                value={nueva}
+                onChange={(e) => setNueva(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCambioOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={guardandoPass}>
+                {guardandoPass ? <Loader2 className="animate-spin" /> : null}
+                Guardar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }

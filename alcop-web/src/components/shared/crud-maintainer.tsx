@@ -509,6 +509,9 @@ function CrudFormDialog<TForm extends FieldValues>({
                         <Select
                           value={field.value != null ? String(field.value) : undefined}
                           onValueChange={(v) => field.onChange(v)}
+                          // items (value→label) hace que el trigger muestre la
+                          // descripción seleccionada y no el id crudo.
+                          items={Object.fromEntries((f.options ?? []).map((o) => [o.value, o.label]))}
                         >
                           <SelectTrigger id={f.name} className="w-full">
                             <SelectValue placeholder={f.placeholder ?? 'Selecciona…'} />

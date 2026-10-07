@@ -1,8 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { Loader2, Users } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { z } from 'zod'
 
 import { api } from '@/lib/api'
@@ -90,19 +89,6 @@ const columns: CrudColumn<Obra>[] = [
   { key: 'nombre', header: 'Obra', render: (row) => <span className="font-medium">{row.nombre}</span> },
   { key: 'comuna', header: 'Comuna', render: (row) => <span className="text-muted-foreground">{row.comuna ?? '—'}</span> },
   { key: 'estado', header: 'Estado', render: (row) => <EstadoBadge estado={row.estado} /> },
-  {
-    key: '__titulares',
-    header: '',
-    render: (row) => (
-      <Link
-        href={`/obras/${row.id}`}
-        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-secondary"
-      >
-        <Users className="size-3.5" />
-        Titulares
-      </Link>
-    ),
-  },
 ]
 
 function fechaInput(iso: string | null): string {

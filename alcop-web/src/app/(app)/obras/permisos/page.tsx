@@ -1,6 +1,6 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -16,14 +16,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-interface Me {
-  perfil: { nivelPrevencion: string; nivelTecnica: string }
-}
 interface Obra {
   id: number
   codigo: string
   nombre: string
-  estado: string
 }
 interface Usuario {
   id: string
@@ -42,45 +38,35 @@ const ROLES = [
   { value: 'PREVENCIONISTA', label: 'Prevencionista', hint: 'Requiere acceso a Prevención.' },
 ] as const
 
-export default function ObraTitularesPage() {
-  const params = useParams<{ id: string }>()
-  const obraId = Number(params.id)
+export default function PermisosObraPage() {
   const queryClient = useQueryClient()
+  const [obraId, setObraId] = useState<number | null>(null)
 
-  const { data: me } = useQuery({
-    queryKey: ['me'],
-    queryFn: () => api.get('usuarios/me').json<Me>(),
-    retry: false,
+  const { data: obrasResp } = useQuery({
+    queryKey: ['obras', { all: true }],
+    queryFn: () => api.get('nucleo/obras', { searchParams: { limit: '100' } }).json<{ data: Obra[] }>(),
   })
-  const esAdmin = me?.perfil.nivelPrevencion === 'TOTAL' && me?.perfil.nivelTecnica === 'TOTAL'
+  const obras = obrasResp?.data ?? []
+  const selectedObraId = obraId ?? obras[0]?.id ?? null
 
-  const { data: obra } = useQuery({
-    queryKey: ['obra', obraId],
-    queryFn: () => api.get(`nucleo/obras/${obraId}`).json<Obra>(),
-    enabled: Number.isFinite(obraId),
-  })
-
-  // OBR-009: límite de 100 usuarios sin búsqueda — suficiente para Etapa 1
-  // (~24 usuarios). Agregar búsqueda/paginación al crecer la base (ver spec §10).
   const { data: usuariosResp } = useQuery({
     queryKey: ['usuarios', { all: true }],
     queryFn: () => api.get('usuarios', { searchParams: { limit: '100' } }).json<{ data: Usuario[] }>(),
-    enabled: esAdmin,
   })
   const usuarios = usuariosResp?.data ?? []
 
   const { data: titResp, isLoading } = useQuery({
-    queryKey: ['obra-titulares', obraId],
-    queryFn: () => api.get(`nucleo/obras/${obraId}/titulares`).json<{ data: Titular[] }>(),
-    enabled: Number.isFinite(obraId),
+    queryKey: ['obra-titulares', selectedObraId],
+    queryFn: () => api.get(`nucleo/obras/${selectedObraId}/titulares`).json<{ data: Titular[] }>(),
+    enabled: selectedObraId !== null,
   })
   const titulares = titResp?.data ?? []
 
-  const invalidar = () => queryClient.invalidateQueries({ queryKey: ['obra-titulares', obraId] })
+  const invalidar = () => queryClient.invalidateQueries({ queryKey: ['obra-titulares', selectedObraId] })
 
   const asignar = useMutation({
     mutationFn: (body: { rolObra: string; usuarioId: string }) =>
-      api.post(`nucleo/obras/${obraId}/titulares`, { json: body }).json(),
+      api.post(`nucleo/obras/${selectedObraId}/titulares`, { json: body }).json(),
     onSuccess: () => {
       toast.success('Titular asignado.')
       invalidar()
@@ -89,7 +75,7 @@ export default function ObraTitularesPage() {
   })
 
   const quitar = useMutation({
-    mutationFn: (titularId: number) => api.delete(`nucleo/obras/${obraId}/titulares/${titularId}`),
+    mutationFn: (titularId: number) => api.delete(`nucleo/obras/${selectedObraId}/titulares/${titularId}`),
     onSuccess: () => {
       toast.success('Titular quitado.')
       invalidar()
@@ -101,19 +87,36 @@ export default function ObraTitularesPage() {
 
   return (
     <>
-      <BreadcrumbBar backHref="/obras" trail="Obras" current={obra?.nombre ?? 'Titulares'} />
+      <BreadcrumbBar backHref="/obras" trail="Accesos" current="Permisos Obra" />
       <main className="flex-1 p-8">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-foreground">
-            {obra ? obra.nombre : 'Obra'}{' '}
-            {obra ? <span className="font-mono text-base text-muted-foreground">· {obra.codigo}</span> : null}
-          </h1>
+          <h1 className="text-2xl font-bold text-foreground">Permisos Obra</h1>
           <p className="text-sm text-muted-foreground">
-            Titulares de notificación. Se permite más de un usuario por rol.
-            {faltan > 0 ? (
-              <span className="ml-1 font-medium text-warn-fg">Faltan {faltan} rol(es) por asignar.</span>
-            ) : null}
+            Asociación de usuarios por obra (titulares de notificación). Se permite más de un usuario por rol.
           </p>
+        </div>
+
+        <div className="mt-6 max-w-sm space-y-1.5">
+          <label className="text-xs font-semibold tracking-[0.12em] text-label">OBRA</label>
+          <Select
+            value={selectedObraId != null ? String(selectedObraId) : undefined}
+            onValueChange={(v) => v != null && setObraId(Number(v))}
+            items={Object.fromEntries(obras.map((o) => [String(o.id), `${o.nombre} · ${o.codigo}`]))}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecciona una obra…" />
+            </SelectTrigger>
+            <SelectContent>
+              {obras.map((o) => (
+                <SelectItem key={o.id} value={String(o.id)}>
+                  {o.nombre} · {o.codigo}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {faltan > 0 ? (
+            <p className="text-xs font-medium text-warn-fg">Faltan {faltan} rol(es) por asignar en esta obra.</p>
+          ) : null}
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -144,46 +147,43 @@ export default function ObraTitularesPage() {
                           <div className="truncate text-sm font-medium text-foreground">{t.usuario.nombre}</div>
                           <div className="truncate text-xs text-muted-foreground">{t.usuario.email}</div>
                         </div>
-                        {esAdmin ? (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Quitar"
-                            disabled={quitar.isPending}
-                            onClick={() => quitar.mutate(t.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <X />
-                          </Button>
-                        ) : null}
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Quitar"
+                          disabled={quitar.isPending}
+                          onClick={() => quitar.mutate(t.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X />
+                        </Button>
                       </div>
                     ))
                   )}
                 </div>
 
-                {esAdmin ? (
-                  <div className="mt-3">
-                    <Select
-                      value={undefined}
-                      onValueChange={(usuarioId) => {
-                        if (typeof usuarioId === 'string') {
-                          asignar.mutate({ rolObra: rol.value, usuarioId })
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Agregar usuario…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {disponibles.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {u.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : null}
+                <div className="mt-3">
+                  <Select
+                    value={undefined}
+                    onValueChange={(usuarioId) => {
+                      if (selectedObraId != null && typeof usuarioId === 'string') {
+                        asignar.mutate({ rolObra: rol.value, usuarioId })
+                      }
+                    }}
+                    items={Object.fromEntries(disponibles.map((u) => [u.id, u.nombre]))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Agregar usuario…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {disponibles.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )
           })}
