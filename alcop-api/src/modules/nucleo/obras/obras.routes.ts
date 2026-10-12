@@ -53,4 +53,34 @@ export default async function obrasRoutes(app: FastifyInstance) {
     { preHandler: [requireAuth, requireAdmin], schema: { tags: ['nucleo'], summary: 'Quitar titular de la obra' } },
     obrasController.quitarTitular
   )
+
+  // Lotes de la obra (Docs/lotes-procedimientos.md §5.3) — gobernados por la
+  // función OBRAS (Lectura para ver, Total para configurar).
+  app.get(
+    '/obras/:id/lotes',
+    { preHandler: [requireAuth, leerObras], schema: { tags: ['nucleo'], summary: 'Listar lotes de la obra' } },
+    obrasController.listarLotes
+  )
+  app.post(
+    '/obras/:id/lotes',
+    { preHandler: [requireAuth, editarObras], schema: { tags: ['nucleo'], summary: 'Agregar lote a la obra' } },
+    obrasController.agregarLote
+  )
+  app.patch(
+    '/obras/:id/lotes/:loteId',
+    { preHandler: [requireAuth, editarObras], schema: { tags: ['nucleo'], summary: 'Actualizar cantidad de un lote' } },
+    obrasController.actualizarLote
+  )
+  app.delete(
+    '/obras/:id/lotes/:loteId',
+    { preHandler: [requireAuth, editarObras], schema: { tags: ['nucleo'], summary: 'Quitar lote de la obra' } },
+    obrasController.quitarLote
+  )
+
+  // Formularios de control aplicables a la obra (derivado de la cadena de lotes).
+  app.get(
+    '/obras/:id/formularios-aplicables',
+    { preHandler: [requireAuth, leerObras], schema: { tags: ['nucleo'], summary: 'Formularios de control aplicables a la obra' } },
+    obrasController.formulariosAplicables
+  )
 }

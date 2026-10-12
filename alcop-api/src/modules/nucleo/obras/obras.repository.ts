@@ -136,4 +136,95 @@ export const obrasRepository = {
       },
     })
   },
+
+  // ─── Lotes de la obra ─────────────────────────────────────────────────────
+  async listarLotes(obraId: number) {
+    return prisma.obraLote.findMany({
+      where: { obraId, eliminadoEn: null },
+      orderBy: [{ tipoLote: { orden: 'asc' } }, { id: 'asc' }],
+      include: { tipoLote: { select: { id: true, codigo: true, nombre: true, activo: true } } },
+    })
+  },
+
+  async buscarLote(id: number) {
+    return prisma.obraLote.findFirst({
+      where: { id, eliminadoEn: null },
+      include: { tipoLote: { select: { id: true, codigo: true, nombre: true, activo: true } } },
+    })
+  },
+
+  async tipoLoteActivo(tipoLoteId: number) {
+    return prisma.tipoLote.findFirst({
+      where: { id: tipoLoteId, eliminadoEn: null, activo: true },
+      select: { id: true },
+    })
+  },
+
+  async crearLote(obraId: number, tipoLoteId: number, cantidad: number, creadoPor: string) {
+    // El @@unique([obraId, tipoLoteId]) incluye filas soft-deleted: si existe una
+    // configuración previa retirada, se revive en vez de insertar (evita P2002).
+    const existente = await prisma.obraLote.findFirst({ where: { obraId, tipoLoteId } })
+    if (existente) {
+      if (existente.eliminadoEn === null) return null // conflicto real: ya está activo
+      return prisma.obraLote.update({
+        where: { id: existente.id },
+        data: { cantidad, eliminadoEn: null, eliminadoPor: null, actualizadoPor: creadoPor },
+        include: { tipoLote: { select: { id: true, codigo: true, nombre: true, activo: true } } },
+      })
+    }
+    return prisma.obraLote.create({
+      data: { obraId, tipoLoteId, cantidad, creadoPor },
+      include: { tipoLote: { select: { id: true, codigo: true, nombre: true, activo: true } } },
+    })
+  },
+
+  async actualizarLote(id: number, cantidad: number, actualizadoPor: string) {
+    return prisma.obraLote.update({
+      where: { id },
+      data: { cantidad, actualizadoPor },
+      include: { tipoLote: { select: { id: true, codigo: true, nombre: true, activo: true } } },
+    })
+  },
+
+  async softDeleteLote(id: number, eliminadoPor: string) {
+    return prisma.obraLote.update({ where: { id }, data: { eliminadoEn: new Date(), eliminadoPor } })
+  },
+
+  /**
+   * Derivación de formularios aplicables (lotes-procedimientos.md §5.4): recorre
+   * Obra → Lotes activos → TipoLote activo → Procedimiento activo → Formulario
+   * activo, considerando solo filas no eliminadas en toda la cadena.
+   */
+  async lotesParaDerivacion(obraId: number) {
+    return prisma.obraLote.findMany({
+      where: { obraId, eliminadoEn: null, tipoLote: { eliminadoEn: null, activo: true } },
+      orderBy: [{ tipoLote: { orden: 'asc' } }, { id: 'asc' }],
+      include: {
+        tipoLote: {
+          select: {
+            id: true,
+            nombre: true,
+            procedimientos: {
+              where: { procedimiento: { eliminadoEn: null, activo: true } },
+              include: {
+                procedimiento: {
+                  select: {
+                    id: true,
+                    codigo: true,
+                    nombre: true,
+                    formularios: {
+                      where: { formulario: { eliminadoEn: null, activo: true } },
+                      include: {
+                        formulario: { select: { id: true, codigo: true, nombre: true, areaId: true, activo: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+  },
 }

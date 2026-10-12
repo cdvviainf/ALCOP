@@ -3,8 +3,14 @@ import { BusinessError, ConflictError, NotFoundError } from '../../../shared/err
 import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
 import { obrasRepository } from './obras.repository.js'
-import type { ActualizarObraInput, AsignarTitularInput, CrearObraInput } from './obras.schema.js'
-import type { ObraDTO, TitularDTO } from './obras.types.js'
+import type {
+  ActualizarLoteInput,
+  ActualizarObraInput,
+  AgregarLoteInput,
+  AsignarTitularInput,
+  CrearObraInput,
+} from './obras.schema.js'
+import type { FormularioAplicableDTO, ObraDTO, ObraLoteDTO, TitularDTO } from './obras.types.js'
 
 function toDTO(obra: Obra): ObraDTO {
   return {
@@ -33,6 +39,22 @@ function titularToDTO(row: TitularRow): TitularDTO {
     id: row.id,
     rolObra: row.rolObra,
     usuario: row.usuario,
+    creadoEn: row.creadoEn.toISOString(),
+  }
+}
+
+type LoteRow = {
+  id: number
+  cantidad: number
+  creadoEn: Date
+  tipoLote: { id: number; codigo: string; nombre: string; activo: boolean }
+}
+
+function loteToDTO(row: LoteRow): ObraLoteDTO {
+  return {
+    id: row.id,
+    cantidad: row.cantidad,
+    tipoLote: row.tipoLote,
     creadoEn: row.creadoEn.toISOString(),
   }
 }
@@ -158,5 +180,85 @@ export const obrasService = {
     const titular = await obrasRepository.buscarTitular(titularId)
     if (!titular || titular.obraId !== obraId) throw new NotFoundError('Titular', String(titularId))
     await obrasRepository.softDeleteTitular(titularId, eliminadoPor)
+  },
+
+  // ─── Lotes de la obra ─────────────────────────────────────────────────────
+  async listarLotes(obraId: number): Promise<ObraLoteDTO[]> {
+    const obra = await obrasRepository.buscarPorId(obraId)
+    if (!obra) throw new NotFoundError('Obra', String(obraId))
+    const rows = await obrasRepository.listarLotes(obraId)
+    return rows.map(loteToDTO)
+  },
+
+  async agregarLote(obraId: number, data: AgregarLoteInput, creadoPor: string): Promise<ObraLoteDTO> {
+    const obra = await obrasRepository.buscarPorId(obraId)
+    if (!obra) throw new NotFoundError('Obra', String(obraId))
+    const tipo = await obrasRepository.tipoLoteActivo(data.tipoLoteId)
+    if (!tipo) throw new NotFoundError('Tipo de lote', String(data.tipoLoteId))
+
+    const row = await obrasRepository.crearLote(obraId, data.tipoLoteId, data.cantidad, creadoPor)
+    if (!row) throw new ConflictError('Ese tipo de lote ya está configurado en la obra. Edita su cantidad.')
+    return loteToDTO(row)
+  },
+
+  async actualizarLote(
+    obraId: number,
+    loteId: number,
+    data: ActualizarLoteInput,
+    actualizadoPor: string
+  ): Promise<ObraLoteDTO> {
+    const lote = await obrasRepository.buscarLote(loteId)
+    if (!lote || lote.obraId !== obraId) throw new NotFoundError('Lote', String(loteId))
+    const row = await obrasRepository.actualizarLote(loteId, data.cantidad, actualizadoPor)
+    return loteToDTO(row)
+  },
+
+  async quitarLote(obraId: number, loteId: number, eliminadoPor: string): Promise<void> {
+    const lote = await obrasRepository.buscarLote(loteId)
+    if (!lote || lote.obraId !== obraId) throw new NotFoundError('Lote', String(loteId))
+    await obrasRepository.softDeleteLote(loteId, eliminadoPor)
+  },
+
+  /** Deriva los formularios de control aplicables a la obra (lotes-procedimientos.md §5.4). */
+  async formulariosAplicables(obraId: number): Promise<FormularioAplicableDTO[]> {
+    const obra = await obrasRepository.buscarPorId(obraId)
+    if (!obra) throw new NotFoundError('Obra', String(obraId))
+    const lotes = await obrasRepository.lotesParaDerivacion(obraId)
+
+    // Dedup por formulario, agregando la trazabilidad (procedimientos + tipos de lote).
+    const mapa = new Map<number, FormularioAplicableDTO & { _procs: Set<number>; _tipos: Set<number> }>()
+    for (const lote of lotes) {
+      const tipo = lote.tipoLote
+      for (const tp of tipo.procedimientos) {
+        const proc = tp.procedimiento
+        for (const pf of proc.formularios) {
+          const form = pf.formulario
+          let entry = mapa.get(form.id)
+          if (!entry) {
+            entry = {
+              id: form.id,
+              codigo: form.codigo,
+              nombre: form.nombre,
+              areaId: form.areaId,
+              activo: form.activo,
+              procedimientos: [],
+              tiposLote: [],
+              _procs: new Set(),
+              _tipos: new Set(),
+            }
+            mapa.set(form.id, entry)
+          }
+          if (!entry._procs.has(proc.id)) {
+            entry._procs.add(proc.id)
+            entry.procedimientos.push({ id: proc.id, codigo: proc.codigo, nombre: proc.nombre })
+          }
+          if (!entry._tipos.has(tipo.id)) {
+            entry._tipos.add(tipo.id)
+            entry.tiposLote.push({ id: tipo.id, nombre: tipo.nombre })
+          }
+        }
+      }
+    }
+    return Array.from(mapa.values()).map(({ _procs, _tipos, ...dto }) => dto)
   },
 }

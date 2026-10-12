@@ -24,6 +24,9 @@
 | 11 | **Perfil** | 6 precargados (ver tabla en `usuarios-perfiles.md` §6); nivel por Área, no por ítem de menú individual. |
 | 12 | **Usuario** | Vía Better Auth + tabla propia con `perfilId`. |
 | 13 | **UsuarioObra** | No es un catálogo clásico — es la asignación obra↔usuario↔rol que dispara las alertas. |
+| 14 | **TipoLote** | Maestro dinámico de tipos de unidad (Casa, Departamento, Bodega…). M:N con Procedimiento. Ver `lotes-procedimientos.md`. Función `TIPOS_LOTE`. |
+| 15 | **Procedimiento** | Maestro de procedimientos constructivos con PDF normativo + vigencia; M:N con Formulario (control). Ver `lotes-procedimientos.md`. Función `PROCEDIMIENTOS`. |
+| 16 | **ObraLote** | Configuración de lotes de una obra (cantidad por tipo). Vive dentro del mantenedor de Obra (función `OBRAS`). |
 
 ## No son mantenedores — son el motor dinámico (punto 2 del pedido)
 

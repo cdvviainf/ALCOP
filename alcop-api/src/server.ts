@@ -24,6 +24,11 @@ await app.register(import('@fastify/helmet'), {
   contentSecurityPolicy: env.NODE_ENV === 'production',
 })
 await registerSwagger(app)
+// Subida de archivos (PDF de procedimientos — Docs/lotes-procedimientos.md).
+// Límite de tamaño por archivo desde el entorno; un solo archivo por request.
+await app.register(import('@fastify/multipart'), {
+  limits: { fileSize: env.PROCEDIMIENTO_PDF_MAX_MB * 1024 * 1024, files: 1 },
+})
 await errorHandler(app)
 
 // ─── Better Auth ────────────────────────────────────────────────────────────
@@ -87,6 +92,11 @@ await app.register(import('./modules/nucleo/areas/areas.routes.js'), { prefix: '
 await app.register(import('./modules/nucleo/funciones/funciones.routes.js'), { prefix: '/api/nucleo' })
 await app.register(import('./modules/nucleo/perfiles/perfiles.routes.js'), { prefix: '/api/nucleo' })
 await app.register(import('./modules/nucleo/categorias-formulario/categorias-formulario.routes.js'), {
+  prefix: '/api/nucleo',
+})
+await app.register(import('./modules/nucleo/formularios/formularios.routes.js'), { prefix: '/api/nucleo' })
+await app.register(import('./modules/nucleo/tipos-lote/tipos-lote.routes.js'), { prefix: '/api/nucleo' })
+await app.register(import('./modules/nucleo/procedimientos/procedimientos.routes.js'), {
   prefix: '/api/nucleo',
 })
 await app.register(import('./modules/prevencion/niveles-riesgo/niveles-riesgo.routes.js'), {

@@ -56,6 +56,23 @@ export const titularParamSchema = z.object({
   titularId: z.coerce.number().int().positive(),
 })
 
+// ─── Lotes de la obra (Docs/lotes-procedimientos.md §5.3) ──────────────────────
+export const agregarLoteSchema = z.object({
+  tipoLoteId: z.coerce.number().int().positive(),
+  cantidad: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1'),
+})
+
+export const actualizarLoteSchema = z.object({
+  cantidad: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1'),
+})
+
+export const loteParamSchema = z.object({
+  id: z.coerce.number().int().positive(), // obra
+  loteId: z.coerce.number().int().positive(),
+})
+
 export type CrearObraInput = z.infer<typeof crearObraSchema>
 export type ActualizarObraInput = z.infer<typeof actualizarObraSchema>
 export type AsignarTitularInput = z.infer<typeof asignarTitularSchema>
+export type AgregarLoteInput = z.infer<typeof agregarLoteSchema>
+export type ActualizarLoteInput = z.infer<typeof actualizarLoteSchema>

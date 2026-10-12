@@ -5,3 +5,6 @@ dist/
 *.log
 coverage/
 .DS_Store
+
+# Archivos subidos en runtime (PDFs de procedimientos) — persisten en volumen, no en git
+uploads/

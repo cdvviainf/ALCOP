@@ -93,6 +93,24 @@ export function requirePermiso(codigo: string, min: 'LECTURA' | 'TOTAL'): preHan
   }
 }
 
+/**
+ * Exige un nivel mínimo sobre AL MENOS UNA de varias funciones (OR). Para
+ * listados-picker consumidos por más de un flujo: el catálogo de un maestro lo
+ * necesita tanto su propia función (maestro) como la función del flujo que lo
+ * usa como selector (p. ej. TipoLote lo lee OBRAS al configurar lotes; el catálogo
+ * de Procedimientos lo lee TIPOS_LOTE al vincular). Los `esAdmin` pasan siempre.
+ */
+export function requireAlguno(codigos: string[], min: 'LECTURA' | 'TOTAL'): preHandlerHookHandler {
+  return async (request, reply) => {
+    if (request.esAdmin) return
+    if (!codigos.some((codigo) => cumple(request.permisos?.[codigo], min))) {
+      reply.status(403).send({
+        error: { code: 'FORBIDDEN', message: 'No tiene acceso a esta función.' },
+      })
+    }
+  }
+}
+
 /** Exige ser Administrador transversal (`esAdmin`). Config de Accesos. */
 export const requireAdmin: preHandlerHookHandler = async (request, reply) => {
   if (!request.esAdmin) {

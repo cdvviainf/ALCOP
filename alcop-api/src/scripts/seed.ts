@@ -29,6 +29,8 @@ async function seedAreas() {
 
 const FUNCIONES: Array<{ codigo: string; nombre: string; area: FuncionArea; orden: number }> = [
   { codigo: 'OBRAS', nombre: 'Obras', area: FuncionArea.TRANSVERSAL, orden: 1 },
+  { codigo: 'TIPOS_LOTE', nombre: 'Tipos de Lote', area: FuncionArea.TRANSVERSAL, orden: 2 },
+  { codigo: 'PROCEDIMIENTOS', nombre: 'Procedimientos', area: FuncionArea.TRANSVERSAL, orden: 3 },
   { codigo: 'PREV_INSPECCION', nombre: 'Inspección Prevención', area: FuncionArea.PREVENCION, orden: 1 },
   { codigo: 'PREV_FORMULARIOS', nombre: 'Formularios', area: FuncionArea.PREVENCION, orden: 2 },
   { codigo: 'PREV_ANALISIS_IA', nombre: 'Análisis IA', area: FuncionArea.PREVENCION, orden: 3 },
@@ -142,6 +144,32 @@ async function seedCategorias(areaPrevencionId: number, areaTecnicaId: number) {
     if (!existente) {
       await prisma.categoriaFormulario.create({
         data: { areaId: fila.areaId, codigo, nombre: fila.nombre },
+      })
+    }
+  }
+}
+
+async function seedFormularios(areaPrevencionId: number, areaTecnicaId: number) {
+  // Formularios de control de ejemplo (Formulario.codigo @unique → find-or-create).
+  // El motor CRUD completo de Formulario/Pregunta es un módulo aparte, aún
+  // pendiente; esto solo deja plantillas de muestra para probar la cadena
+  // lotes → procedimientos → formularios (Docs/lotes-procedimientos.md).
+  async function categoriaId(areaId: number, codigo: string): Promise<number | null> {
+    const c = await prisma.categoriaFormulario.findFirst({ where: { areaId, codigo }, select: { id: true } })
+    return c?.id ?? null
+  }
+  const defs = [
+    { codigo: 'EPP-CTRL-001', nombre: 'Control de EPP', areaId: areaPrevencionId, catCodigo: 'EPP' },
+    { codigo: 'ALT-CTRL-001', nombre: 'Control Trabajos en Altura', areaId: areaPrevencionId, catCodigo: 'TRABAJOS_EN_ALTURA' },
+    { codigo: 'LCH-AT-01AS-CTRL', nombre: 'Control LCH-AT-01AS', areaId: areaTecnicaId, catCodigo: 'LCH_AT_01AS' },
+  ]
+  for (const d of defs) {
+    const catId = await categoriaId(d.areaId, d.catCodigo)
+    if (!catId) continue // la categoría de muestra no existe: se omite sin fallar
+    const existente = await prisma.formulario.findUnique({ where: { codigo: d.codigo } })
+    if (!existente) {
+      await prisma.formulario.create({
+        data: { codigo: d.codigo, nombre: d.nombre, areaId: d.areaId, categoriaId: catId, creadoPor: 'seed' },
       })
     }
   }
@@ -317,6 +345,7 @@ async function main() {
   await seedTiposHallazgo()
   await seedEtapasConstructivas()
   await seedEtapasNido()
+  await seedFormularios(prevencion.id, tecnica.id)
   await seedObras()
   // El seed del admin es best-effort: un fallo acá NO debe abortar el arranque
   // del contenedor (el CMD encadena `seed && server`).
@@ -326,8 +355,8 @@ async function main() {
     console.warn('⚠️  Seed de admin falló (no bloquea el arranque):', (err as Error).message)
   }
   console.log(
-    '✅ Seed completado: 2 Areas, 15 Funciones, 6 Perfiles, 11 Categorías, 4 Niveles de riesgo, ' +
-      '3 Tipos de hallazgo, 5 Etapas constructivas, 6 Etapas de nido, 4 Obras.'
+    '✅ Seed completado: 2 Areas, 17 Funciones, 6 Perfiles, 11 Categorías, 4 Niveles de riesgo, ' +
+      '3 Tipos de hallazgo, 5 Etapas constructivas, 6 Etapas de nido, 3 Formularios, 4 Obras.'
   )
 }
 

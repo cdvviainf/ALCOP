@@ -217,6 +217,7 @@ alcop-web/
 | `usuarios-perfiles.md` | **Cerrado (v2 granular)** | Area, Usuario (esAdmin), Perfil + Funcion + PerfilPermiso, UsuarioObra |
 | `formularios-dinamicos.md` | **Cerrado** | CategoriaFormulario, Formulario, Pregunta, RespuestaFormulario, RespuestaPregunta, FormularioPermiso |
 | `nucleo-compartido.md` | Pendiente de spec | Obra, PanelResumen |
+| `lotes-procedimientos.md` | **Cerrado (v0.1, 12-10-2026)** | TipoLote, Procedimiento (PDF), TipoLoteProcedimiento, ProcedimientoFormulario, ObraLote; cadena Obra→Lotes→Procedimientos→Formularios + derivación de formularios aplicables |
 | `prevencion.md` | Pendiente de spec | Hallazgo, VisitaPrevencion, AnalisisIA |
 | `tecnica.md` | Pendiente de spec | VisitaTecnica, HitoEtapa (nidos/puntales), AnalisisIA |
 | `reportes.md` | Pendiente de spec | Reporte (PDF generado), vínculo a Formulario/Visita/Hallazgo/AnalisisIA |

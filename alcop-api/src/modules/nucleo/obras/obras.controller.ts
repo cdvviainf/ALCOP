@@ -1,10 +1,13 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { UnauthorizedError } from '../../../shared/errors.js'
 import {
+  actualizarLoteSchema,
   actualizarObraSchema,
+  agregarLoteSchema,
   asignarTitularSchema,
   crearObraSchema,
   listarObrasQuerySchema,
+  loteParamSchema,
   obraIdParamSchema,
   titularParamSchema,
 } from './obras.schema.js'
@@ -60,5 +63,37 @@ export const obrasController = {
     const { id, titularId } = titularParamSchema.parse(request.params)
     await obrasService.quitarTitular(id, titularId, request.usuarioId)
     return reply.status(204).send()
+  },
+
+  // ─── Lotes ────────────────────────────────────────────────────────────────
+  async listarLotes(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = obraIdParamSchema.parse(request.params)
+    return reply.send({ data: await obrasService.listarLotes(id) })
+  },
+
+  async agregarLote(request: FastifyRequest, reply: FastifyReply) {
+    if (!request.usuarioId) throw new UnauthorizedError()
+    const { id } = obraIdParamSchema.parse(request.params)
+    const data = agregarLoteSchema.parse(request.body)
+    return reply.status(201).send(await obrasService.agregarLote(id, data, request.usuarioId))
+  },
+
+  async actualizarLote(request: FastifyRequest, reply: FastifyReply) {
+    if (!request.usuarioId) throw new UnauthorizedError()
+    const { id, loteId } = loteParamSchema.parse(request.params)
+    const data = actualizarLoteSchema.parse(request.body)
+    return reply.send(await obrasService.actualizarLote(id, loteId, data, request.usuarioId))
+  },
+
+  async quitarLote(request: FastifyRequest, reply: FastifyReply) {
+    if (!request.usuarioId) throw new UnauthorizedError()
+    const { id, loteId } = loteParamSchema.parse(request.params)
+    await obrasService.quitarLote(id, loteId, request.usuarioId)
+    return reply.status(204).send()
+  },
+
+  async formulariosAplicables(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = obraIdParamSchema.parse(request.params)
+    return reply.send({ data: await obrasService.formulariosAplicables(id) })
   },
 }

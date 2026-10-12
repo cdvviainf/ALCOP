@@ -90,10 +90,17 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       AI_API_KEY: ${AI_API_KEY:-}
+      # Almacenamiento de PDFs de procedimientos (Docs/lotes-procedimientos.md §4).
+      # Debe apuntar al volumen persistente montado abajo, o los archivos se
+      # pierden al recrear el contenedor (QA-LP-011).
+      UPLOAD_DIR: /app/uploads
       # Admin sembrado por el CMD del Dockerfile. Sin SEED_ADMIN_PASSWORD el seed
       # NO crea/rota el admin. Cambiar la var + redeploy rota la contraseña.
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@alcop.cl}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+    volumes:
+      # PDFs de procedimientos — persisten entre deploys (QA-LP-011).
+      - alcop_qa_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,4 +132,6 @@ volumes:
   alcop_qa_postgres_data:
     driver: local
   alcop_qa_redis_data:
+    driver: local
+  alcop_qa_uploads:
     driver: local

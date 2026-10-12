@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowUp,
+  Blocks,
   Boxes,
   Building2,
   ChevronRight,
@@ -14,6 +15,8 @@ import {
   FolderTree,
   Gauge,
   HardHat,
+  Layers3,
+  ScrollText,
   IdCard,
   KeyRound,
   LayoutDashboard,
@@ -105,6 +108,9 @@ const NAV: Seccion[] = [
     seccion: 'Configuración',
     items: [
       { title: 'Obras', href: '/obras', icon: Building2, requiere: ['OBRAS'] },
+      { title: 'Lotes de Obra', href: '/obras/lotes', icon: Layers3, requiere: ['OBRAS'] },
+      { title: 'Tipos de Lote', href: '/configuracion/tipos-lote', icon: Blocks, requiere: ['TIPOS_LOTE'] },
+      { title: 'Procedimientos', href: '/configuracion/procedimientos', icon: ScrollText, requiere: ['PROCEDIMIENTOS'] },
       { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: ['PREV_FORMULARIOS', 'TEC_FORMULARIOS'] },
       {
         title: 'Datos Maestros',
