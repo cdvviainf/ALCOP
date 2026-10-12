@@ -2,7 +2,6 @@ import { Prisma, type Procedimiento } from '@prisma/client'
 import { BusinessError, ConflictError, NotFoundError } from '../../../shared/errors.js'
 import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
-import { borrarArchivo, guardarPdf } from '../../../shared/archivos.js'
 import { procedimientosRepository } from './procedimientos.repository.js'
 import type { ActualizarProcedimientoInput, CrearProcedimientoInput } from './procedimientos.schema.js'
 import type {
@@ -97,30 +96,30 @@ export const procedimientosService = {
     return { ...toDTO(row), formularios: row.formularios.map(formToDTO) }
   },
 
-  /** Devuelve la clave de almacenamiento del PDF (para servir la descarga). */
-  async obtenerArchivoKey(id: number): Promise<{ archivoUrl: string; codigo: string }> {
-    const row = await procedimientosRepository.buscarPorId(id)
+  /** Devuelve el PDF (bytes) y el código, para servir la descarga. */
+  async obtenerArchivo(id: number): Promise<{ datos: Buffer; codigo: string }> {
+    const row = await procedimientosRepository.buscarArchivo(id)
     if (!row) throw new NotFoundError('Procedimiento', String(id))
-    return { archivoUrl: row.archivoUrl, codigo: row.codigo }
+    if (!row.archivo) {
+      throw new BusinessError('ARCHIVO_NO_ENCONTRADO', 'El procedimiento no tiene PDF adjunto.', 404)
+    }
+    return { datos: Buffer.from(row.archivo.datos), codigo: row.codigo }
   },
 
   async crear(data: CrearProcedimientoInput, archivo: ArchivoPdf | null, creadoPor: string): Promise<ProcedimientoDTO> {
     validarPdf(archivo)
-    // Pre-chequeo de código único para no dejar un PDF huérfano si colisiona.
     if (await procedimientosRepository.buscarPorCodigo(data.codigo)) {
       throw new ConflictError(`Ya existe un procedimiento con el código ${data.codigo}.`)
     }
-    const archivoUrl = await guardarPdf('procedimientos', archivo.buffer)
     try {
+      // El PDF se guarda en BD (bytes) en la misma operación de alta.
       const row = await procedimientosRepository.crear(
         { codigo: data.codigo, nombre: data.nombre, vigenciaDesde: data.vigenciaDesde, vigenciaHasta: data.vigenciaHasta ?? null },
-        archivoUrl,
+        archivo.buffer,
         creadoPor
       )
       return toDTO(row)
     } catch (err) {
-      // Si la inserción falla (p. ej. carrera en el código único), no dejar basura en disco.
-      await borrarArchivo(archivoUrl)
       if (esConflictoUnico(err)) throw new ConflictError(`Ya existe un procedimiento con el código ${data.codigo}.`)
       throw err
     }
@@ -161,10 +160,8 @@ export const procedimientosService = {
     validarPdf(archivo)
     const existente = await procedimientosRepository.buscarPorId(id)
     if (!existente) throw new NotFoundError('Procedimiento', String(id))
-    const nuevaKey = await guardarPdf('procedimientos', archivo.buffer)
-    const row = await procedimientosRepository.actualizarArchivo(id, nuevaKey, actualizadoPor)
-    // Borra el PDF anterior solo tras persistir la nueva referencia (best-effort).
-    if (existente.archivoUrl && existente.archivoUrl !== nuevaKey) await borrarArchivo(existente.archivoUrl)
+    // Reemplaza el PDF en BD (upsert del blob); el anterior se sobrescribe.
+    const row = await procedimientosRepository.actualizarArchivo(id, archivo.buffer, actualizadoPor)
     return toDTO(row)
   },
 

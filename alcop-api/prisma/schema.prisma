@@ -391,8 +391,8 @@ model Procedimiento {
   nombre         String
   vigenciaDesde  DateTime            // fecha desde la que rige el documento
   vigenciaHasta  DateTime?           // null = vigente indefinido
-  archivoUrl     String              // PDF adjunto (disco local en Etapa 1)
   activo         Boolean   @default(true)
+  archivo        ProcedimientoArchivo? // PDF adjunto (bytes en BD — ver modelo abajo)
   tiposLote      TipoLoteProcedimiento[]
   formularios    ProcedimientoFormulario[]
   creadoEn       DateTime  @default(now())
@@ -401,6 +401,17 @@ model Procedimiento {
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
+}
+
+// PDF del procedimiento almacenado EN LA BASE DE DATOS (bytea). Tabla separada de
+// Procedimiento a propósito: así los listados/detalles del maestro nunca cargan
+// el binario en memoria; solo se lee al descargar (Docs/lotes-procedimientos.md §4).
+model ProcedimientoArchivo {
+  id              Int           @id @default(autoincrement())
+  procedimientoId Int           @unique
+  procedimiento   Procedimiento @relation(fields: [procedimientoId], references: [id])
+  datos           Bytes         // contenido del PDF
+  actualizadoEn   DateTime      @updatedAt
 }
 
 // Puente M:N  TipoLote ↔ Procedimiento (arista, no entidad de negocio).

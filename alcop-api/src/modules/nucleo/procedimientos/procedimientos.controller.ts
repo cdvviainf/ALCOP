@@ -1,6 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { BusinessError, UnauthorizedError } from '../../../shared/errors.js'
-import { streamArchivo } from '../../../shared/archivos.js'
 import {
   actualizarProcedimientoSchema,
   crearProcedimientoSchema,
@@ -61,12 +60,10 @@ export const procedimientosController = {
 
   async descargarArchivo(request: FastifyRequest, reply: FastifyReply) {
     const { id } = procedimientoIdParamSchema.parse(request.params)
-    const { archivoUrl, codigo } = await procedimientosService.obtenerArchivoKey(id)
-    const stream = streamArchivo(archivoUrl)
-    if (!stream) throw new BusinessError('ARCHIVO_NO_ENCONTRADO', 'El PDF del procedimiento no está disponible.', 404)
+    const { datos, codigo } = await procedimientosService.obtenerArchivo(id)
     reply.header('Content-Type', 'application/pdf')
     reply.header('Content-Disposition', `inline; filename="${codigo}.pdf"`)
-    return reply.send(stream)
+    return reply.send(datos)
   },
 
   async crear(request: FastifyRequest, reply: FastifyReply) {

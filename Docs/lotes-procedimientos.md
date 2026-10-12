@@ -58,8 +58,8 @@ model Procedimiento {
   nombre        String
   vigenciaDesde DateTime              // fecha desde la que rige el documento
   vigenciaHasta DateTime?             // null = vigente indefinido
-  archivoUrl    String                // PDF adjunto (disco local en Etapa 1)
   activo        Boolean   @default(true)
+  archivo       ProcedimientoArchivo? // PDF adjunto (bytes en BD, tabla separada)
   tiposLote     TipoLoteProcedimiento[]
   formularios   ProcedimientoFormulario[]
   creadoEn      DateTime  @default(now())
@@ -120,7 +120,7 @@ model ObraLote {
 ### Decisiones cerradas (12-10-2026)
 
 1. **Vigencia**: rango `vigenciaDesde` (obligatoria) + `vigenciaHasta` (opcional, null = sin término). El flag "vigente hoy" se deriva por fecha, no se almacena.
-2. **PDF**: se guarda `archivoUrl` (disco local en Etapa 1); storage definitivo (S3-compatible) se decide junto con las fotos de formularios/IA — misma deuda pendiente.
+2. **PDF**: el binario se guarda **en la base de datos** (columna `Bytes`/`bytea`) en la tabla `ProcedimientoArchivo` (1:1 con `Procedimiento`), separada a propósito para no cargar el blob en listados/detalles (decisión de Christian, 12-10-2026 — reemplaza el disco local que se usaba antes). Ventajas: el backup de la BD incluye los PDFs y no hay volumen ni permisos de filesystem. Límite `PROCEDIMIENTO_PDF_MAX_MB` (20 MB), solo `application/pdf`. La descarga se sirve por `GET /procedimientos/:id/archivo` (streamea los bytes desde la BD).
 3. **Lotes agregados**: `ObraLote.cantidad` por tipo, sin enumerar unidades individuales. Si las inspecciones terminan siendo por unidad (Casa-45), se evalúa un modelo de instancias al especificar las visitas — no en Etapa 1.
 4. **Procedimiento sin área**: enlaza formularios de cualquier área (Prevención o Técnica).
 5. **Permisos/menú**: dos funciones nuevas transversales (`TIPOS_LOTE`, `PROCEDIMIENTOS`) en Configuración; la composición de lotes de la obra se gobierna por la función existente `OBRAS`.
@@ -169,7 +169,7 @@ model ObraLote {
 
 ## 10. Pendientes
 
-- [ ] Definir storage definitivo del PDF (disco local vs S3-compatible) — compartido con fotos de formularios/IA.
+- [x] Storage del PDF: **en BD (bytea)** desde 12-10-2026 (ver decisión #2). Si a futuro los PDFs crecen mucho, evaluar mover a object storage (S3) junto con las fotos de formularios/IA.
 - [ ] ¿Inspección por unidad individual de lote (Casa-45) o basta el agregado? — se resuelve al especificar visitas (prevencion.md/tecnica.md).
 - [ ] ¿El `GET …/formularios-aplicables` debe también exponerse por tipo de lote dentro de la obra (checklist por lote) o solo el consolidado de la obra? — definir al construir visitas.
 - [ ] Límite de tamaño/formato del PDF definitivo (hoy 20 MB, solo `application/pdf`).

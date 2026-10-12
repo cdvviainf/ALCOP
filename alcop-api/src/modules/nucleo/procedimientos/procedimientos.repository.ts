@@ -73,17 +73,19 @@ export const procedimientosRepository = {
 
   async crear(
     data: { codigo: string; nombre: string; vigenciaDesde: Date; vigenciaHasta: Date | null },
-    archivoUrl: string,
+    archivo: Buffer,
     creadoPor: string
   ) {
+    // El PDF se crea anidado en la misma operación (bytes en BD). El select
+    // explícito evita devolver el blob.
     return prisma.procedimiento.create({
       data: {
         codigo: data.codigo,
         nombre: data.nombre,
         vigenciaDesde: data.vigenciaDesde,
         vigenciaHasta: data.vigenciaHasta,
-        archivoUrl,
         creadoPor,
+        archivo: { create: { datos: archivo } },
       },
     })
   },
@@ -102,8 +104,23 @@ export const procedimientosRepository = {
     })
   },
 
-  async actualizarArchivo(id: number, archivoUrl: string, actualizadoPor: string) {
-    return prisma.procedimiento.update({ where: { id }, data: { archivoUrl, actualizadoPor } })
+  async actualizarArchivo(id: number, archivo: Buffer, actualizadoPor: string) {
+    // Upsert del blob (reemplaza el PDF si ya existía, lo crea si no) + marca al actor.
+    return prisma.procedimiento.update({
+      where: { id },
+      data: {
+        actualizadoPor,
+        archivo: { upsert: { create: { datos: archivo }, update: { datos: archivo } } },
+      },
+    })
+  },
+
+  /** Lee el PDF (bytes) de un procedimiento para servir la descarga. */
+  async buscarArchivo(id: number) {
+    return prisma.procedimiento.findFirst({
+      where: { id, eliminadoEn: null },
+      select: { codigo: true, archivo: { select: { datos: true } } },
+    })
   },
 
   async softDelete(id: number, eliminadoPor: string) {

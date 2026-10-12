@@ -48,6 +48,7 @@ RUN addgroup --system --gid 1001 nodejs \
 USER fastify
 EXPOSE 3001
 # tini como PID 1. El CLI `prisma` viene en dependencies (ver scaffold), así que
-# `migrate deploy` NO descarga nada en runtime.
+# `migrate deploy` NO descarga nada en runtime. El PDF de procedimientos se guarda
+# en BD (bytea), no en disco → no hace falta volumen ni escritura a filesystem.
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/scripts/seed.js && node dist/server.js"]
