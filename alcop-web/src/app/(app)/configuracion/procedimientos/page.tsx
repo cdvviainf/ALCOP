@@ -294,7 +294,7 @@ export default function ProcedimientosPage() {
             <VinculosManager
               linkedPath={`nucleo/procedimientos/${gestionando.id}/formularios`}
               invalidateKey={['procedimiento-formularios', gestionando.id]}
-              catalogoPath="nucleo/formularios"
+              catalogoPath="nucleo/formularios/opciones"
               linkBody={(formularioId) => ({ formularioId })}
               puedeEditar={puedeEditar}
               emptyMessage="Sin formularios de control."

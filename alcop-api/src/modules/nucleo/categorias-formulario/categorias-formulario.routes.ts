@@ -14,6 +14,13 @@ export default async function categoriasFormularioRoutes(app: FastifyInstance) {
     { preHandler: [requireAuth], schema: { tags: ['nucleo'], summary: 'Listar categorías de formulario' } },
     categoriasController.listar
   )
+  // Picker para el builder de formularios (categorías activas del área) —
+  // accesible por la función Categorías O Formularios del área (QA-FD-004).
+  app.get(
+    '/categorias-formulario/opciones',
+    { preHandler: [requireAuth], schema: { tags: ['nucleo'], summary: 'Opciones de categoría por área (picker)' } },
+    categoriasController.listarOpciones
+  )
   app.get(
     '/categorias-formulario/:id',
     { preHandler: [requireAuth], schema: { tags: ['nucleo'], summary: 'Detalle de categoría' } },

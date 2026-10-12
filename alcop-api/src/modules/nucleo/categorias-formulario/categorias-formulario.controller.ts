@@ -5,6 +5,7 @@ import {
   categoriaIdParamSchema,
   crearCategoriaSchema,
   listarCategoriasQuerySchema,
+  opcionesCategoriaQuerySchema,
 } from './categorias-formulario.schema.js'
 import { categoriasService } from './categorias-formulario.service.js'
 
@@ -13,6 +14,13 @@ export const categoriasController = {
   async listar(request: FastifyRequest, reply: FastifyReply) {
     const { page, limit, q, areaId } = listarCategoriasQuerySchema.parse(request.query)
     return reply.send(await categoriasService.listar({ page, limit }, { esAdmin: request.esAdmin, permisos: request.permisos }, q, areaId))
+  },
+
+  async listarOpciones(request: FastifyRequest, reply: FastifyReply) {
+    const { areaId } = opcionesCategoriaQuerySchema.parse(request.query)
+    return reply.send({
+      data: await categoriasService.listarOpciones(areaId, { esAdmin: request.esAdmin, permisos: request.permisos }),
+    })
   },
 
   async obtener(request: FastifyRequest, reply: FastifyReply) {

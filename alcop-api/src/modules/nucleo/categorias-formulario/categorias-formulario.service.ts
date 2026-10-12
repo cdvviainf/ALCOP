@@ -15,6 +15,13 @@ const CAT_FUNCION: Record<string, string> = {
   TECNICA: 'TEC_CAT_CATEGORIAS',
 }
 
+// El picker de categorías (builder de formularios) también lo necesita quien
+// administra Formularios del área, aunque no administre Categorías (QA-FD-004).
+const FORM_FUNCION: Record<string, string> = {
+  PREVENCION: 'PREV_FORMULARIOS',
+  TECNICA: 'TEC_FORMULARIOS',
+}
+
 type FilaConArea = {
   id: number
   areaId: number
@@ -74,6 +81,23 @@ export const categoriasService = {
     )
     const { rows, total } = await categoriasRepository.listar(pagination, q, areaId, codigosArea)
     return paginate(rows.map(toDTO), total, pagination)
+  },
+
+  async listarOpciones(
+    areaId: number,
+    acceso: Acceso
+  ): Promise<Array<{ id: number; codigo: string; nombre: string }>> {
+    const area = await categoriasRepository.buscarArea(areaId)
+    if (!area) throw new NotFoundError('Área', String(areaId))
+    // Puede ver las categorías del área quien administra sus Categorías O sus
+    // Formularios (el builder las necesita). esAdmin pasa siempre.
+    const nivelForm = acceso.esAdmin
+      ? 'TOTAL'
+      : (acceso.permisos?.[FORM_FUNCION[area.codigo]] ?? 'SIN_ACCESO')
+    const puede =
+      nivelCategoriasDeArea(acceso, area.codigo) !== 'SIN_ACCESO' || nivelForm !== 'SIN_ACCESO'
+    if (!puede) throw new ForbiddenError('Sin acceso a las categorías de esta área.')
+    return categoriasRepository.listarOpciones(areaId)
   },
 
   async obtener(id: number, acceso: Acceso): Promise<CategoriaFormularioDTO> {

@@ -1,9 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { Bell, Plus, Search, ChevronLeft } from 'lucide-react'
+import { Bell, Search, ChevronLeft } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 /** Shell blanco del header — barra superior del área clara (h-16, borde inferior). */
@@ -15,7 +14,7 @@ export function AppHeader({ children }: { children: React.ReactNode }) {
   )
 }
 
-/** Barra superior por defecto: buscador + campana + "Nueva visita" (mockup web-02). */
+/** Barra superior por defecto: buscador + campana. */
 export function TopBar() {
   return (
     <AppHeader>
@@ -37,14 +36,6 @@ export function TopBar() {
           <Bell className="size-5" />
           <span className="absolute right-2 top-2 size-2 rounded-full bg-primary ring-2 ring-white" />
         </button>
-        <Button
-          nativeButton={false}
-          render={<Link href="/formularios/epp" />}
-          className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-hover"
-        >
-          <Plus className="size-4" strokeWidth={2.5} />
-          Nueva visita
-        </Button>
       </div>
     </AppHeader>
   )

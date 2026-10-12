@@ -51,6 +51,16 @@ export const categoriasRepository = {
     })
   },
 
+  /** Picker: categorías ACTIVAS de un área, proyección mínima (id/codigo/nombre). */
+  async listarOpciones(areaId: number) {
+    return prisma.categoriaFormulario.findMany({
+      where: { areaId, eliminadoEn: null, activo: true },
+      orderBy: { nombre: 'asc' },
+      take: 100,
+      select: { id: true, codigo: true, nombre: true },
+    })
+  },
+
   async buscarArea(areaId: number) {
     return prisma.area.findUnique({ where: { id: areaId }, select: { id: true, codigo: true, nombre: true } })
   },

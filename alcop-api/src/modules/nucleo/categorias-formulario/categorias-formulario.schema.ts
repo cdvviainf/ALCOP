@@ -10,6 +10,11 @@ export const categoriaIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 })
 
+/** Query del picker de categorías de un área (para el builder de formularios). */
+export const opcionesCategoriaQuerySchema = z.object({
+  areaId: z.coerce.number().int().positive(),
+})
+
 /** El `codigo` lo genera el servicio (slug del nombre). El área no se cambia en update. */
 export const crearCategoriaSchema = z.object({
   areaId: z.coerce.number().int().positive(),
