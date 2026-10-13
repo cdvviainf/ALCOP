@@ -33,6 +33,8 @@ export const preguntaSchema = z
     tipoRespuesta: tipoRespuestaSchema,
     obligatoria: z.boolean().optional().default(true),
     permiteFoto: z.boolean().optional().default(false),
+    // Solo tiene efecto si permiteFoto (el service la fuerza a false si no).
+    fotoObligatoria: z.boolean().optional().default(false),
     opciones: z.array(z.string().trim().min(1)).optional().default([]),
   })
   .refine((p) => p.tipoRespuesta !== 'SELECCION_MULTIPLE' || p.opciones.length >= 2, {

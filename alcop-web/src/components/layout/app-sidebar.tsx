@@ -100,16 +100,14 @@ const NAV: Seccion[] = [
   {
     seccion: 'Registro',
     items: [
-      { title: 'Inspección Técnica', href: '/registro/inspeccion-tecnica', icon: HardHat, requiere: ['TEC_INSPECCION'] },
-      { title: 'Inspección Prevención', href: '/registro/inspeccion-prevencion', icon: ShieldCheck, requiere: ['PREV_INSPECCION'] },
+      { title: 'Visita Técnica', href: '/registro/inspeccion-tecnica', icon: HardHat, requiere: ['TEC_INSPECCION'] },
+      { title: 'Visita Prevención', href: '/registro/inspeccion-prevencion', icon: ShieldCheck, requiere: ['PREV_INSPECCION'] },
     ],
   },
   {
     seccion: 'Configuración',
     items: [
       { title: 'Obras', href: '/obras', icon: Building2, requiere: ['OBRAS'] },
-      { title: 'Lotes de Obra', href: '/obras/lotes', icon: Layers3, requiere: ['OBRAS'] },
-      { title: 'Tipos de Lote', href: '/configuracion/tipos-lote', icon: Blocks, requiere: ['TIPOS_LOTE'] },
       { title: 'Procedimientos', href: '/configuracion/procedimientos', icon: ScrollText, requiere: ['PROCEDIMIENTOS'] },
       { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: ['PREV_FORMULARIOS', 'TEC_FORMULARIOS'] },
       {
@@ -120,6 +118,8 @@ const NAV: Seccion[] = [
             title: 'Técnicos',
             icon: Wrench,
             children: [
+              { title: 'Tipos de Lote', href: '/configuracion/tipos-lote', icon: Blocks, requiere: ['TIPOS_LOTE'] },
+              { title: 'Lotes de Obra', href: '/obras/lotes', icon: Layers3, requiere: ['OBRAS'] },
               { title: 'Categorías', href: '/formularios/categorias/tecnica', icon: FolderTree, requiere: ['TEC_CAT_CATEGORIAS'] },
               { title: 'Tipos Hallazgo', href: '/tecnica/tipos-hallazgo', icon: ListChecks, requiere: ['TEC_CAT_TIPOS_HALLAZGO'] },
               { title: 'Etapas Constructivas', href: '/tecnica/etapas-constructivas', icon: Layers, requiere: ['TEC_CAT_ETAPAS_CONSTRUCTIVAS'] },

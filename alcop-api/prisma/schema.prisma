@@ -313,16 +313,18 @@ model Formulario {
 }
 
 model Pregunta {
-  id            Int      @id @default(autoincrement())
-  formularioId  Int
-  formulario    Formulario @relation(fields: [formularioId], references: [id])
-  orden         Int
-  texto         String
-  tipoRespuesta TipoRespuesta
-  obligatoria   Boolean  @default(true)
-  permiteFoto   Boolean  @default(false)
-  opciones      String[]
-  respuestas    RespuestaPregunta[]
+  id              Int      @id @default(autoincrement())
+  formularioId    Int
+  formulario      Formulario @relation(fields: [formularioId], references: [id])
+  orden           Int
+  texto           String
+  tipoRespuesta   TipoRespuesta
+  obligatoria     Boolean  @default(true)
+  permiteFoto     Boolean  @default(false)
+  // Si permiteFoto, la foto puede además ser obligatoria al responder.
+  fotoObligatoria Boolean  @default(false)
+  opciones        String[]
+  respuestas      RespuestaPregunta[]
 }
 
 model RespuestaFormulario {

@@ -55,6 +55,7 @@ const preguntaForm = z.object({
   tipoRespuesta: z.enum(['CHECKBOX', 'SELECCION_MULTIPLE', 'NUMERO', 'TEXTO', 'TEXTO_LARGO']),
   obligatoria: z.boolean(),
   permiteFoto: z.boolean(),
+  fotoObligatoria: z.boolean(),
   // Siempre presente (los defaults la inicializan en ''); evita desajuste de
   // tipos input/output del resolver.
   opcionesText: z.string(),
@@ -92,6 +93,7 @@ const PREGUNTA_VACIA: BuilderValues['preguntas'][number] = {
   tipoRespuesta: 'CHECKBOX',
   obligatoria: true,
   permiteFoto: false,
+  fotoObligatoria: false,
   opcionesText: '',
 }
 
@@ -173,6 +175,7 @@ export function FormularioBuilder({
         tipoRespuesta: p.tipoRespuesta,
         obligatoria: p.obligatoria,
         permiteFoto: p.permiteFoto,
+        fotoObligatoria: p.permiteFoto ? p.fotoObligatoria : false,
         opciones: p.tipoRespuesta === 'SELECCION_MULTIPLE' ? opcionesDe(p.opcionesText ?? '') : [],
       }))
       if (modo === 'editar' && formularioId) {
@@ -389,7 +392,7 @@ export function FormularioBuilder({
                 <div className="text-xs text-muted-foreground">
                   {TIPOS.find((t) => t.value === p.tipoRespuesta)?.label ?? p.tipoRespuesta}
                   {p.obligatoria ? ' · obligatoria' : ''}
-                  {p.permiteFoto ? ' · con foto' : ''}
+                  {p.permiteFoto ? (p.fotoObligatoria ? ' · foto obligatoria' : ' · con foto') : ''}
                 </div>
               </div>
             ))}
@@ -476,6 +479,18 @@ export function FormularioBuilder({
                         </label>
                       )}
                     />
+                    {preguntas?.[i]?.permiteFoto ? (
+                      <Controller
+                        name={`preguntas.${i}.fotoObligatoria`}
+                        control={control}
+                        render={({ field }) => (
+                          <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                            <Checkbox checked={field.value} onCheckedChange={(c) => field.onChange(Boolean(c))} />
+                            Foto obligatoria
+                          </label>
+                        )}
+                      />
+                    ) : null}
                   </div>
                 </div>
 

@@ -7,13 +7,14 @@ import { tiposLoteRepository } from './tipos-lote.repository.js'
 import type { ActualizarTipoLoteInput, CrearTipoLoteInput } from './tipos-lote.schema.js'
 import type { ProcedimientoVinculadoDTO, TipoLoteDTO, TipoLoteDetalleDTO } from './tipos-lote.types.js'
 
-function toDTO(row: TipoLote): TipoLoteDTO {
+function toDTO(row: TipoLote, procedimientosCount = 0): TipoLoteDTO {
   return {
     id: row.id,
     codigo: row.codigo,
     nombre: row.nombre,
     orden: row.orden,
     activo: row.activo,
+    procedimientosCount,
     creadoEn: row.creadoEn.toISOString(),
   }
 }
@@ -35,7 +36,11 @@ function esConflictoUnico(err: unknown): boolean {
 export const tiposLoteService = {
   async listar(pagination: PaginationQuery, q?: string): Promise<Paginated<TipoLoteDTO>> {
     const { rows, total } = await tiposLoteRepository.listar(pagination, q)
-    return paginate(rows.map(toDTO), total, pagination)
+    return paginate(
+      rows.map((r) => toDTO(r, r.procedimientosCount)),
+      total,
+      pagination
+    )
   },
 
   async listarOpciones(q?: string): Promise<Array<{ id: number; codigo: string; nombre: string }>> {
@@ -45,7 +50,7 @@ export const tiposLoteService = {
   async obtener(id: number): Promise<TipoLoteDetalleDTO> {
     const row = await tiposLoteRepository.buscarConProcedimientos(id)
     if (!row) throw new NotFoundError('Tipo de lote', String(id))
-    return { ...toDTO(row), procedimientos: row.procedimientos.map(procToDTO) }
+    return { ...toDTO(row, row.procedimientos.length), procedimientos: row.procedimientos.map(procToDTO) }
   },
 
   async crear(data: CrearTipoLoteInput, creadoPor: string): Promise<TipoLoteDTO> {
@@ -65,7 +70,8 @@ export const tiposLoteService = {
     const codigo = data.nombre !== undefined ? slugCodigo(data.nombre) : undefined
     try {
       const row = await tiposLoteRepository.actualizar(id, data, codigo, actualizadoPor)
-      return toDTO(row)
+      const procedimientosCount = await tiposLoteRepository.contarProcedimientosActivos(id)
+      return toDTO(row, procedimientosCount)
     } catch (err) {
       if (esConflictoUnico(err)) throw new ConflictError('Ya existe un tipo de lote con ese nombre.')
       throw err

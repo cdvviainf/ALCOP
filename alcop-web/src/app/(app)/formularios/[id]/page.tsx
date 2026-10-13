@@ -13,6 +13,7 @@ interface PreguntaDetalle {
   tipoRespuesta: 'CHECKBOX' | 'SELECCION_MULTIPLE' | 'NUMERO' | 'TEXTO' | 'TEXTO_LARGO'
   obligatoria: boolean
   permiteFoto: boolean
+  fotoObligatoria: boolean
   opciones: string[]
 }
 interface FormularioDetalle {
@@ -49,6 +50,7 @@ export default function EditarFormularioPage({ params }: { params: Promise<{ id:
           tipoRespuesta: p.tipoRespuesta,
           obligatoria: p.obligatoria,
           permiteFoto: p.permiteFoto,
+          fotoObligatoria: p.fotoObligatoria,
           opcionesText: p.opciones.join('\n'),
         })),
       }

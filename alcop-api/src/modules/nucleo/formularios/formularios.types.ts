@@ -8,6 +8,7 @@ export interface PreguntaDTO {
   tipoRespuesta: TipoRespuesta
   obligatoria: boolean
   permiteFoto: boolean
+  fotoObligatoria: boolean
   opciones: string[]
 }
 

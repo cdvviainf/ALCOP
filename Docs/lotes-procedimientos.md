@@ -123,7 +123,7 @@ model ObraLote {
 2. **PDF**: el binario se guarda **en la base de datos** (columna `Bytes`/`bytea`) en la tabla `ProcedimientoArchivo` (1:1 con `Procedimiento`), separada a propósito para no cargar el blob en listados/detalles (decisión de Christian, 12-10-2026 — reemplaza el disco local que se usaba antes). Ventajas: el backup de la BD incluye los PDFs y no hay volumen ni permisos de filesystem. Límite `PROCEDIMIENTO_PDF_MAX_MB` (20 MB), solo `application/pdf`. La descarga se sirve por `GET /procedimientos/:id/archivo` (streamea los bytes desde la BD).
 3. **Lotes agregados**: `ObraLote.cantidad` por tipo, sin enumerar unidades individuales. Si las inspecciones terminan siendo por unidad (Casa-45), se evalúa un modelo de instancias al especificar las visitas — no en Etapa 1.
 4. **Procedimiento sin área**: enlaza formularios de cualquier área (Prevención o Técnica).
-5. **Permisos/menú**: dos funciones nuevas transversales (`TIPOS_LOTE`, `PROCEDIMIENTOS`) en Configuración; la composición de lotes de la obra se gobierna por la función existente `OBRAS`.
+5. **Permisos/menú**: dos funciones nuevas transversales (`TIPOS_LOTE`, `PROCEDIMIENTOS`); la composición de lotes de la obra se gobierna por la función existente `OBRAS`. **Ubicación en el menú (13-10-2026, decisión de Christian):** los ítems **Tipos de Lote** y **Lotes de Obra** se agrupan bajo **Datos Maestros → Técnicos** en el sidebar. Es una decisión de **organización/UX** del menú; NO cambia los permisos: `TIPOS_LOTE` sigue siendo transversal y la composición de lotes sigue gobernada por `OBRAS` (los guards del backend son los mismos). `Procedimientos` permanece como ítem de Configuración.
 
 ## 5. Flujos
 

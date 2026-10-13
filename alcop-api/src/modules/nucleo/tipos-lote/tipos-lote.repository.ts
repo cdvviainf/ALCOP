@@ -23,11 +23,31 @@ export const tiposLoteRepository = {
       prisma.tipoLote.findMany({ where, skip, take, orderBy: [{ orden: 'asc' }, { id: 'asc' }] }),
       prisma.tipoLote.count({ where }),
     ])
-    return { rows, total }
+    // Conteo de procedimientos activos vinculados por tipo (sin N+1).
+    const ids = rows.map((r) => r.id)
+    const counts = ids.length
+      ? await prisma.tipoLoteProcedimiento.groupBy({
+          by: ['tipoLoteId'],
+          where: { tipoLoteId: { in: ids }, procedimiento: { eliminadoEn: null } },
+          _count: { _all: true },
+        })
+      : []
+    const countMap = new Map(counts.map((c) => [c.tipoLoteId, c._count._all]))
+    return {
+      rows: rows.map((r) => ({ ...r, procedimientosCount: countMap.get(r.id) ?? 0 })),
+      total,
+    }
   },
 
   async buscarPorId(id: number) {
     return prisma.tipoLote.findFirst({ where: { id, eliminadoEn: null } })
+  },
+
+  /** Cuenta los procedimientos activos vinculados a un tipo de lote. */
+  async contarProcedimientosActivos(tipoLoteId: number) {
+    return prisma.tipoLoteProcedimiento.count({
+      where: { tipoLoteId, procedimiento: { eliminadoEn: null } },
+    })
   },
 
   /**

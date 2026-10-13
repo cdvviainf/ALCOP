@@ -41,6 +41,7 @@ type PreguntaRow = {
   tipoRespuesta: TipoRespuesta
   obligatoria: boolean
   permiteFoto: boolean
+  fotoObligatoria: boolean
   opciones: string[]
 }
 type FormularioRow = {
@@ -64,6 +65,7 @@ function preguntaToDTO(p: PreguntaRow): PreguntaDTO {
     tipoRespuesta: p.tipoRespuesta,
     obligatoria: p.obligatoria,
     permiteFoto: p.permiteFoto,
+    fotoObligatoria: p.fotoObligatoria,
     opciones: p.opciones,
   }
 }

@@ -30,6 +30,7 @@ interface TipoLote extends Record<string, unknown> {
   nombre: string
   orden: number
   activo: boolean
+  procedimientosCount: number
   creadoEn: string
 }
 
@@ -69,8 +70,13 @@ export default function TiposLotePage() {
       ),
     },
     {
-      key: '__procs',
+      key: 'procedimientosCount',
       header: 'Procedimientos',
+      render: (row) => <span className="text-muted-foreground">{row.procedimientosCount}</span>,
+    },
+    {
+      key: '__procs',
+      header: '',
       render: (row) => (
         <Button variant="outline" size="sm" onClick={() => setGestionando(row)}>
           <Workflow className="size-4" />

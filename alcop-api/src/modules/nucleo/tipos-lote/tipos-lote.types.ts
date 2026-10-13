@@ -13,6 +13,8 @@ export interface TipoLoteDTO {
   nombre: string
   orden: number
   activo: boolean
+  /** Cantidad de procedimientos activos vinculados (para la columna del listado). */
+  procedimientosCount: number
   creadoEn: string
 }
 

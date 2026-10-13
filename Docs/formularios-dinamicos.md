@@ -57,7 +57,8 @@ model Pregunta {
   texto           String     // el punto de chequeo / la pregunta
   tipoRespuesta   TipoRespuesta
   obligatoria     Boolean    @default(true)
-  permiteFoto     Boolean    @default(false) // registro fotográfico opcional por pregunta
+  permiteFoto     Boolean    @default(false) // habilita el registro fotográfico en la pregunta
+  fotoObligatoria Boolean    @default(false) // si permiteFoto, la foto es requerida al responder (13-10-2026, pedido de Christian)
   opciones        String[]   // solo aplica si tipoRespuesta = SELECCION_MULTIPLE (lista de alternativas)
 }
 
@@ -124,7 +125,7 @@ model FormularioPermiso {
 
 - **Tipos de respuesta soportados en Etapa 1** (punto 2 del pedido de Christian): `CHECKBOX`, `SELECCION_MULTIPLE`, `NUMERO`, `TEXTO`, `TEXTO_LARGO`. El `CHECKBOX` reusa el patrón Cumple/No cumple/N.A. ya validado en el mockup; no es un booleano simple.
 - **Selección de obra**: vive en `RespuestaFormulario`, no en `Formulario` — un formulario es una plantilla reutilizable en cualquier obra; quien la selecciona es quien la responde, no quien la crea. (`Formulario.requiereObra` existe por si en el futuro se necesita un formulario que no dependa de obra — hoy siempre es `true`.)
-- **Registro fotográfico**: es una capacidad por pregunta (`Pregunta.permiteFoto`), no un tipo de respuesta aparte — una pregunta `CHECKBOX` puede o no pedir foto, igual que una `TEXTO`.
+- **Registro fotográfico**: es una capacidad por pregunta (`Pregunta.permiteFoto`), no un tipo de respuesta aparte — una pregunta `CHECKBOX` puede o no pedir foto, igual que una `TEXTO`. Además, si `permiteFoto`, la foto puede marcarse como **obligatoria** (`fotoObligatoria`, 13-10-2026): en ese caso la respuesta no se podrá guardar sin imagen. `fotoObligatoria` solo tiene efecto cuando `permiteFoto = true` (se fuerza a false en el backend si no). La **validación al responder** (rechazar la respuesta si falta la foto obligatoria) vive en el **motor de llenado**, que está diferido a la vista de Registros (ver estado de implementación) — hoy solo se persiste la configuración de la plantilla.
 - **Permisos por nivel de Área** (confirmado con Christian 06-10-2026 — el Perfil es dinámico y su nivel por Área gobierna esto):
   - **TOTAL**: crear, editar y eliminar plantillas (Formulario/Pregunta) y categorías del área, además de ver y completar/responder.
   - **LECTURA**: ver **y completar/responder** formularios del área — NO crea ni elimina plantillas.

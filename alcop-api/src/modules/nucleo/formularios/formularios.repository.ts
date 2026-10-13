@@ -19,6 +19,8 @@ function preguntasCreate(preguntas: PreguntaInput[]) {
     tipoRespuesta: p.tipoRespuesta,
     obligatoria: p.obligatoria,
     permiteFoto: p.permiteFoto,
+    // Foto obligatoria solo si además permite foto.
+    fotoObligatoria: p.permiteFoto ? p.fotoObligatoria : false,
     opciones: p.tipoRespuesta === 'SELECCION_MULTIPLE' ? p.opciones : [],
   }))
 }
