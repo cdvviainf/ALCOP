@@ -127,12 +127,21 @@ async function lockVisitaEnCurso(
 export const visitasService = {
   async listar(
     pagination: PaginationQuery,
-    q?: string,
-    obraId?: number,
-    estado?: 'EN_CURSO' | 'FINALIZADA'
+    opts: {
+      q?: string
+      obraId?: number
+      usuarioId?: string
+      estado?: 'EN_CURSO' | 'FINALIZADA'
+      orden: 'fecha' | 'obra' | 'inspector'
+      dir: 'asc' | 'desc'
+    }
   ): Promise<Paginated<VisitaDTO>> {
-    const { rows, total } = await visitasRepository.listar(pagination, q, obraId, estado)
+    const { rows, total } = await visitasRepository.listar(pagination, opts)
     return paginate(rows.map(toDTO), total, pagination)
+  },
+
+  async listarInspectores(): Promise<Array<{ id: string; nombre: string }>> {
+    return visitasRepository.inspectores()
   },
 
   async obtener(id: number): Promise<VisitaDetalleDTO> {
@@ -192,11 +201,11 @@ export const visitasService = {
   },
 
   async eliminar(id: number, eliminadoPor: string): Promise<void> {
-    // Una visita FINALIZADA es registro histórico: no se elimina (QA-OLA-A-004).
-    await prisma.$transaction(async (tx) => {
-      await lockVisitaEnCurso(tx, id)
-      await visitasRepository.softDelete(id, eliminadoPor, tx)
-    })
+    const visita = await visitasRepository.buscarBasica(id)
+    if (!visita) throw new NotFoundError('Visita', String(id))
+    // Soft delete con timestamp, en cualquier estado (decisión de Christian 13-10-2026:
+    // la lista ofrece eliminar; supersede QA-OLA-A-004). Reversible: eliminadoEn/eliminadoPor.
+    await visitasRepository.softDelete(id, eliminadoPor)
   },
 
   // ─── Hallazgos ─────────────────────────────────────────────────────────────

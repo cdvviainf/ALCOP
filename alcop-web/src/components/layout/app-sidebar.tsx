@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   Layers3,
   ScrollText,
+  Settings,
   IdCard,
   KeyRound,
   LayoutDashboard,
@@ -146,7 +147,13 @@ const NAV: Seccion[] = [
       { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard, requiere: 'admin' },
       // Permisos Obra: asociación de usuarios (titulares) por obra.
       { title: 'Permisos Obra', href: '/obras/permisos', icon: KeyRound, requiere: 'admin' },
-      { title: 'Calidad de imagen', href: '/configuracion/calidad-imagen', icon: ImageIcon, requiere: 'admin' },
+      {
+        title: 'Configuración',
+        icon: Settings,
+        children: [
+          { title: 'Calidad de imagen', href: '/configuracion/calidad-imagen', icon: ImageIcon, requiere: 'admin' },
+        ],
+      },
     ],
   },
 ]

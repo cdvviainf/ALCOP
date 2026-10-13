@@ -41,19 +41,48 @@ const listaInclude = {
 
 /** Acceso a datos de Visitas Técnicas (CLAUDE.md §12.2). */
 export const visitasRepository = {
-  async listar(pagination: PaginationQuery, q?: string, obraId?: number, estado?: 'EN_CURSO' | 'FINALIZADA') {
+  async listar(
+    pagination: PaginationQuery,
+    opts: {
+      q?: string
+      obraId?: number
+      usuarioId?: string
+      estado?: 'EN_CURSO' | 'FINALIZADA'
+      orden: 'fecha' | 'obra' | 'inspector'
+      dir: 'asc' | 'desc'
+    }
+  ) {
+    const { q, obraId, usuarioId, estado, orden, dir } = opts
     const where: Prisma.VisitaTecnicaWhereInput = {
       eliminadoEn: null,
       ...(obraId ? { obraId } : {}),
+      ...(usuarioId ? { usuarioId } : {}),
       ...(estado ? { estado } : {}),
       ...(q ? { obra: { OR: [{ nombre: { contains: q, mode: 'insensitive' } }, { codigo: { contains: q, mode: 'insensitive' } }] } } : {}),
     }
+    const orderBy: Prisma.VisitaTecnicaOrderByWithRelationInput[] =
+      orden === 'obra'
+        ? [{ obra: { nombre: dir } }, { id: 'desc' }]
+        : orden === 'inspector'
+          ? [{ usuario: { nombre: dir } }, { id: 'desc' }]
+          : [{ fecha: dir }, { id: dir }]
     const { skip, take } = toPrismaRange(pagination)
     const [rows, total] = await prisma.$transaction([
-      prisma.visitaTecnica.findMany({ where, skip, take, orderBy: { id: 'desc' }, include: listaInclude }),
+      prisma.visitaTecnica.findMany({ where, skip, take, orderBy, include: listaInclude }),
       prisma.visitaTecnica.count({ where }),
     ])
     return { rows, total }
+  },
+
+  /** Inspectores (usuarios distintos) con visitas — para el filtro por inspector. */
+  async inspectores() {
+    const rows = await prisma.visitaTecnica.findMany({
+      where: { eliminadoEn: null },
+      distinct: ['usuarioId'],
+      orderBy: { usuario: { nombre: 'asc' } },
+      select: { usuario: { select: { id: true, nombre: true } } },
+    })
+    return rows.map((r) => r.usuario)
   },
 
   async buscarPorId(id: number) {

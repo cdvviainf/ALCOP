@@ -13,8 +13,13 @@ const editar = requirePermiso('TEC_INSPECCION', 'TOTAL')
 export default async function visitasRoutes(app: FastifyInstance) {
   app.get(
     '/visitas',
-    { preHandler: [requireAuth, leer], schema: { tags: ['tecnica'], summary: 'Listar visitas (paginado)' } },
+    { preHandler: [requireAuth, leer], schema: { tags: ['tecnica'], summary: 'Listar visitas (paginado, filtros y orden)' } },
     visitasController.listar
+  )
+  app.get(
+    '/visitas/inspectores',
+    { preHandler: [requireAuth, leer], schema: { tags: ['tecnica'], summary: 'Inspectores con visitas (para filtro)' } },
+    visitasController.listarInspectores
   )
   app.get(
     '/visitas/:id',

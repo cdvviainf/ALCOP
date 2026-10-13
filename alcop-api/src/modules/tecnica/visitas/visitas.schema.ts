@@ -13,7 +13,10 @@ export const calidadImagenSchema = z.enum(['ORIGINAL', 'OPTIMIZADA', 'MEDIA', 'B
 export const listarVisitasQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().min(1).optional(),
   obraId: z.coerce.number().int().positive().optional(),
+  usuarioId: z.string().trim().min(1).optional(),
   estado: estadoVisitaSchema.optional(),
+  orden: z.enum(['fecha', 'obra', 'inspector']).optional().default('fecha'),
+  dir: z.enum(['asc', 'desc']).optional().default('desc'),
 })
 
 export const visitaIdParamSchema = z.object({

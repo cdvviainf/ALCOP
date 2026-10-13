@@ -42,8 +42,12 @@ async function parseMultipart(
 /** Controladores thin (CLAUDE.md §12.5). */
 export const visitasController = {
   async listar(request: FastifyRequest, reply: FastifyReply) {
-    const { page, limit, q, obraId, estado } = listarVisitasQuerySchema.parse(request.query)
-    return reply.send(await visitasService.listar({ page, limit }, q, obraId, estado))
+    const { page, limit, q, obraId, usuarioId, estado, orden, dir } = listarVisitasQuerySchema.parse(request.query)
+    return reply.send(await visitasService.listar({ page, limit }, { q, obraId, usuarioId, estado, orden, dir }))
+  },
+
+  async listarInspectores(_request: FastifyRequest, reply: FastifyReply) {
+    return reply.send({ data: await visitasService.listarInspectores() })
   },
 
   async obtener(request: FastifyRequest, reply: FastifyReply) {

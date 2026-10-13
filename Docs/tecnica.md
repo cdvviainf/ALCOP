@@ -29,7 +29,7 @@ Un inspector (función Técnica) va a una obra, recorre **unidades de lote** (Ca
 ```prisma
 enum EstadoVisita {
   EN_CURSO     // editable, se agregan hallazgos
-  FINALIZADA   // cerrada; solo lectura; reporte disponible
+  FINALIZADA   // cerrada; su CONTENIDO queda en solo lectura (no se editan hallazgos/fotos); el reporte queda disponible. Sí se puede ELIMINAR (soft, reversible) — ver §6.
 }
 
 enum CalidadImagen {
@@ -153,7 +153,8 @@ model Configuracion {
 - **Generación de unidades**: `descripcion` con padding a 3 (o al ancho de la cantidad si supera 999). Autogenerada; no editable a mano en esta ola.
 - **Edición**: solo visitas `EN_CURSO` se editan (agregar/quitar hallazgos, subir/borrar fotos). `FINALIZADA` = solo lectura (el reporte sigue disponible).
 - **Fotos**: solo imágenes (`image/*`); se optimizan con `jimp` según la calidad elegida; se guarda el binario en BD + metadata. Límite de tamaño de entrada configurable (default 25 MB antes de optimizar).
-- **Borrado**: soft-delete de visita/hallazgo; el binario de fotos se borra en cascada lógica (al borrar el hallazgo, sus fotos quedan inaccesibles). No hay `DELETE` físico de la visita.
+- **Borrado**: soft-delete de visita/hallazgo con timestamp (`eliminadoEn`/`eliminadoPor`); nunca `DELETE` físico de la visita. La **eliminación de una visita se permite en cualquier estado** (también `FINALIZADA`), porque es reversible (soft delete) — decisión de Christian 13-10-2026, supersede QA-OLA-A-004; `FINALIZADA` sigue siendo solo lectura para su *contenido* (no se editan hallazgos/fotos), pero sí se puede eliminar. El borrado de fotos de un hallazgo es físico (hijos sin auditoría).
+- **Listado**: filtros por obra (`obraId`) y por inspector (`usuarioId`), y orden por `fecha` | `obra` | `inspector` (asc/desc). El filtro de inspectores se alimenta de `GET /visitas/inspectores` (usuarios distintos con visitas).
 - **No bloquear por procedimientos**: este módulo no consulta Procedimientos/Formularios.
 
 ## 7. Validaciones
@@ -165,7 +166,7 @@ model Configuracion {
 
 ## 8. Estados
 
-`VisitaTecnica.estado`: `EN_CURSO` (default) → `FINALIZADA`. Transición por "Finalizar". Sin reapertura en esta ola (pendiente si se necesita).
+`VisitaTecnica.estado`: `EN_CURSO` (default) → `FINALIZADA`. Transición por "Finalizar". Sin reapertura en esta ola (pendiente si se necesita). "Solo lectura" de `FINALIZADA` aplica a su **contenido** (hallazgos/fotos/datos), no al borrado: una visita se puede **eliminar** (soft, reversible) en cualquier estado (decisión de Christian 13-10-2026).
 
 ## 9. Integraciones
 
@@ -182,6 +183,8 @@ model Configuracion {
 - [ ] ¿`resumenFinal` obligatorio para finalizar? (hoy: recomendado).
 - [ ] ¿Reapertura de visitas `FINALIZADA`?
 - [ ] Búsqueda/paginación en el selector de unidad de lote (una obra puede tener cientos de unidades).
+- [ ] **Trazabilidad de eliminadas (QA-VLAF-001):** eliminar una visita (incluida FINALIZADA) es soft-delete con timestamp, pero hoy NO hay vista de "eliminadas" ni restaurar desde la UI — los datos quedan en BD. Decisión de Christian (13-10-2026): cerrar así; agregar una vista de eliminadas + restaurar (para admin) cuando la trazabilidad del histórico sea requisito firme (alcop-esquema.html §07).
+- [ ] El **filtro de obra** del listado de visitas carga las primeras 100 obras sin búsqueda (QA-VLAF-002) — **límite aceptado para Etapa 1** (pocas obras, igual que los demás selectores de obra). Agregar búsqueda/paginación si la base crece. El filtro de **inspector** sale de `GET /visitas/inspectores` (acotado a quienes tienen visitas), sin ese límite.
 - [x] `sharp` fallaba en el servidor (CPU sin x86-64-v2) → se usa `jimp` (JS puro), funciona en cualquier CPU. Menor compresión que sharp; aceptable para Etapa 1. Nota: jimp no decodifica HEIC/WebP (los navegadores suelen entregar JPEG al subir).
 - [ ] Prevención (Visita Prevención) reusando este motor con catálogo `NivelRiesgo` — ola aparte.
 - [ ] Nidos/puntales (hitos) y ciclo de corrección — ola aparte.
