@@ -1,5 +1,5 @@
 import { prisma } from '../../../lib/prisma.js'
-import { requireAuth, requirePermiso } from '../../../plugins/auth-guard.js'
+import { requireAlguno, requireAuth, requirePermiso } from '../../../plugins/auth-guard.js'
 import { crearCatalogoRoutes, type CatalogoDelegate } from '../../../shared/catalogo.factory.js'
 import { slugCodigo } from '../../../shared/slug.js'
 import { actualizarTipoHallazgoSchema, crearTipoHallazgoSchema } from './tipos-hallazgo.schema.js'
@@ -7,7 +7,8 @@ import type { TipoHallazgoTecnicoDTO } from './tipos-hallazgo.types.js'
 
 /**
  * Catálogo TipoHallazgoTecnico (Técnica) — montado bajo /api/tecnica (ver server.ts).
- * Lectura: cualquier usuario activo. Escritura: nivel TOTAL en Técnica.
+ * Lectura: función Categorías del catálogo O el inspector técnico (lo consume como
+ * selector al registrar hallazgos — QA-OLA-B-005). Escritura: TOTAL en el catálogo.
  */
 export default crearCatalogoRoutes({
   ruta: 'tipos-hallazgo',
@@ -27,7 +28,7 @@ export default crearCatalogoRoutes({
     creadoEn: (row.creadoEn as Date).toISOString(),
   }),
   authz: {
-    leer: [requireAuth, requirePermiso('TEC_CAT_TIPOS_HALLAZGO', 'LECTURA')],
+    leer: [requireAuth, requireAlguno(['TEC_CAT_TIPOS_HALLAZGO', 'TEC_INSPECCION'], 'LECTURA')],
     escribir: [requireAuth, requirePermiso('TEC_CAT_TIPOS_HALLAZGO', 'TOTAL')],
   },
 })

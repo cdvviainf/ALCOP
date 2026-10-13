@@ -24,10 +24,13 @@ await app.register(import('@fastify/helmet'), {
   contentSecurityPolicy: env.NODE_ENV === 'production',
 })
 await registerSwagger(app)
-// Subida de archivos (PDF de procedimientos — Docs/lotes-procedimientos.md).
-// Límite de tamaño por archivo desde el entorno; un solo archivo por request.
+// Subida de archivos (PDF de procedimientos, fotos de hallazgos). El tope de
+// transporte es el mayor de los dos límites; cada recurso valida el suyo.
 await app.register(import('@fastify/multipart'), {
-  limits: { fileSize: env.PROCEDIMIENTO_PDF_MAX_MB * 1024 * 1024, files: 1 },
+  limits: {
+    fileSize: Math.max(env.PROCEDIMIENTO_PDF_MAX_MB, env.IMAGEN_MAX_MB) * 1024 * 1024,
+    files: 1,
+  },
 })
 await errorHandler(app)
 
@@ -99,6 +102,7 @@ await app.register(import('./modules/nucleo/tipos-lote/tipos-lote.routes.js'), {
 await app.register(import('./modules/nucleo/procedimientos/procedimientos.routes.js'), {
   prefix: '/api/nucleo',
 })
+await app.register(import('./modules/nucleo/configuracion/configuracion.routes.js'), { prefix: '/api/nucleo' })
 await app.register(import('./modules/prevencion/niveles-riesgo/niveles-riesgo.routes.js'), {
   prefix: '/api/prevencion',
 })
@@ -111,6 +115,7 @@ await app.register(import('./modules/tecnica/etapas-constructivas/etapas-constru
 await app.register(import('./modules/tecnica/etapas-nido/etapas-nido.routes.js'), {
   prefix: '/api/tecnica',
 })
+await app.register(import('./modules/tecnica/visitas/visitas.routes.js'), { prefix: '/api/tecnica' })
 
 try {
   await app.listen({ port: env.PORT, host: '0.0.0.0' })

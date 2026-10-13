@@ -1,4 +1,5 @@
 import { Prisma, type Procedimiento } from '@prisma/client'
+import { env } from '../../../config/env.js'
 import { BusinessError, ConflictError, NotFoundError } from '../../../shared/errors.js'
 import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
@@ -70,13 +71,20 @@ function esConflictoUnico(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
 }
 
-/** Valida que el archivo subido sea un PDF presente (lotes-procedimientos.md §6). */
+/** Valida que el archivo subido sea un PDF presente y dentro del límite (lotes-procedimientos.md §6). */
 function validarPdf(archivo: ArchivoPdf | null): asserts archivo is ArchivoPdf {
   if (!archivo || archivo.buffer.length === 0) {
     throw new BusinessError('ARCHIVO_REQUERIDO', 'Debe adjuntar el PDF del procedimiento.', 422)
   }
   if (archivo.mimetype !== 'application/pdf') {
     throw new BusinessError('ARCHIVO_INVALIDO', 'El archivo debe ser un PDF (application/pdf).', 422)
+  }
+  if (archivo.buffer.length > env.PROCEDIMIENTO_PDF_MAX_MB * 1024 * 1024) {
+    throw new BusinessError(
+      'ARCHIVO_DEMASIADO_GRANDE',
+      `El PDF supera el límite de ${env.PROCEDIMIENTO_PDF_MAX_MB} MB.`,
+      413
+    )
   }
 }
 

@@ -15,6 +15,7 @@ import {
   FolderTree,
   Gauge,
   HardHat,
+  Image as ImageIcon,
   Layers3,
   ScrollText,
   IdCard,
@@ -145,6 +146,7 @@ const NAV: Seccion[] = [
       { title: 'Perfiles', href: '/usuarios/perfiles', icon: IdCard, requiere: 'admin' },
       // Permisos Obra: asociación de usuarios (titulares) por obra.
       { title: 'Permisos Obra', href: '/obras/permisos', icon: KeyRound, requiere: 'admin' },
+      { title: 'Calidad de imagen', href: '/configuracion/calidad-imagen', icon: ImageIcon, requiere: 'admin' },
     ],
   },
 ]

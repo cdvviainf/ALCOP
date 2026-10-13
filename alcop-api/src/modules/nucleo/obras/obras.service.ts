@@ -1,4 +1,5 @@
 import { Prisma, type Obra, type RolObra } from '@prisma/client'
+import { prisma } from '../../../lib/prisma.js'
 import { BusinessError, ConflictError, NotFoundError } from '../../../shared/errors.js'
 import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
@@ -61,6 +62,62 @@ function loteToDTO(row: LoteRow): ObraLoteDTO {
 
 function esConflictoUnico(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
+}
+
+/**
+ * Descripción autogenerada de una unidad: "Casa 001" (Docs/tecnica.md §5.1/§6).
+ * El padding es a 3, o al ancho de la cantidad total si supera 999 ("Casa 1200").
+ */
+function descUnidad(nombre: string, correlativo: number, ancho: number): string {
+  return `${nombre} ${String(correlativo).padStart(ancho, '0')}`
+}
+
+/**
+ * Sincroniza las unidades de lote de un tipo en una obra a `cantidadTarget`:
+ * crea/revive 1..cantidadTarget y quita las > cantidadTarget. Si alguna unidad a
+ * quitar tiene hallazgos, se rechaza (no se puede reducir). Lanza ANTES de tocar
+ * el ObraLote para no dejar inconsistencia.
+ */
+async function sincronizarUnidades(
+  obraId: number,
+  tipoLoteId: number,
+  nombre: string,
+  cantidadTarget: number,
+  db: Prisma.TransactionClient
+): Promise<void> {
+  const existentes = await obrasRepository.unidadesDelTipo(obraId, tipoLoteId, db)
+  const activos = existentes.filter((u) => !u.eliminadoEn)
+  const activosPorCorr = new Map(activos.map((u) => [u.correlativo, u] as const))
+  const borradosPorCorr = new Map(
+    existentes.filter((u) => u.eliminadoEn).map((u) => [u.correlativo, u.id] as const)
+  )
+  // Ancho del padding: 3, o los dígitos de la cantidad si supera 999 (QA-OLA-A-010).
+  const ancho = Math.max(3, String(cantidadTarget).length)
+
+  const aCrear: Array<{ correlativo: number; descripcion: string }> = []
+  const aRevivir: Array<{ id: number; descripcion: string }> = []
+  const aRenombrar: Array<{ id: number; descripcion: string }> = []
+  for (let c = 1; c <= cantidadTarget; c++) {
+    const desc = descUnidad(nombre, c, ancho)
+    const activo = activosPorCorr.get(c)
+    if (activo) {
+      if (activo.descripcion !== desc) aRenombrar.push({ id: activo.id, descripcion: desc })
+      continue
+    }
+    const idBorrado = borradosPorCorr.get(c)
+    if (idBorrado !== undefined) aRevivir.push({ id: idBorrado, descripcion: desc })
+    else aCrear.push({ correlativo: c, descripcion: desc })
+  }
+  const aQuitar = activos.filter((u) => u.correlativo > cantidadTarget).map((u) => u.id)
+  if (aQuitar.length) {
+    const conHallazgos = await obrasRepository.unidadesConHallazgos(aQuitar, db)
+    if (conHallazgos.length) {
+      throw new ConflictError(
+        `No se puede reducir la cantidad: ${conHallazgos.length} unidad(es) tienen hallazgos registrados.`
+      )
+    }
+  }
+  await obrasRepository.aplicarSyncUnidades(obraId, tipoLoteId, aCrear, aRevivir, aRenombrar, aQuitar, db)
 }
 
 /**
@@ -196,8 +253,14 @@ export const obrasService = {
     const tipo = await obrasRepository.tipoLoteActivo(data.tipoLoteId)
     if (!tipo) throw new NotFoundError('Tipo de lote', String(data.tipoLoteId))
 
-    const row = await obrasRepository.crearLote(obraId, data.tipoLoteId, data.cantidad, creadoPor)
-    if (!row) throw new ConflictError('Ese tipo de lote ya está configurado en la obra. Edita su cantidad.')
+    // ObraLote + unidades en una sola transacción (QA-OLA-A-006).
+    const row = await prisma.$transaction(async (tx) => {
+      const lote = await obrasRepository.crearLote(obraId, data.tipoLoteId, data.cantidad, creadoPor, tx)
+      if (!lote) throw new ConflictError('Ese tipo de lote ya está configurado en la obra. Edita su cantidad.')
+      // Autogenera las unidades (Casa 001…) para la cantidad configurada.
+      await sincronizarUnidades(obraId, data.tipoLoteId, lote.tipoLote.nombre, data.cantidad, tx)
+      return lote
+    })
     return loteToDTO(row)
   },
 
@@ -209,14 +272,32 @@ export const obrasService = {
   ): Promise<ObraLoteDTO> {
     const lote = await obrasRepository.buscarLote(loteId)
     if (!lote || lote.obraId !== obraId) throw new NotFoundError('Lote', String(loteId))
-    const row = await obrasRepository.actualizarLote(loteId, data.cantidad, actualizadoPor)
+    // Sync de unidades + cambio de cantidad en una transacción (QA-OLA-A-006). Si
+    // la reducción choca con unidades con hallazgos, lanza y todo hace rollback.
+    const row = await prisma.$transaction(async (tx) => {
+      await sincronizarUnidades(obraId, lote.tipoLote.id, lote.tipoLote.nombre, data.cantidad, tx)
+      return obrasRepository.actualizarLote(loteId, data.cantidad, actualizadoPor, tx)
+    })
     return loteToDTO(row)
   },
 
   async quitarLote(obraId: number, loteId: number, eliminadoPor: string): Promise<void> {
     const lote = await obrasRepository.buscarLote(loteId)
     if (!lote || lote.obraId !== obraId) throw new NotFoundError('Lote', String(loteId))
-    await obrasRepository.softDeleteLote(loteId, eliminadoPor)
+    // Quita unidades (target 0) + soft-delete del lote en una transacción; rechaza
+    // (y revierte) si alguna unidad tiene hallazgos.
+    await prisma.$transaction(async (tx) => {
+      await sincronizarUnidades(obraId, lote.tipoLote.id, lote.tipoLote.nombre, 0, tx)
+      await obrasRepository.softDeleteLote(loteId, eliminadoPor, tx)
+    })
+  },
+
+  async listarUnidades(obraId: number): Promise<
+    Array<{ id: number; descripcion: string; correlativo: number; tipoLote: { id: number; nombre: string } }>
+  > {
+    const obra = await obrasRepository.buscarPorId(obraId)
+    if (!obra) throw new NotFoundError('Obra', String(obraId))
+    return obrasRepository.listarUnidades(obraId)
   },
 
   /** Deriva los formularios de control aplicables a la obra (lotes-procedimientos.md §5.4). */

@@ -175,6 +175,15 @@ async function seedFormularios(areaPrevencionId: number, areaTecnicaId: number) 
   }
 }
 
+async function seedConfiguracion() {
+  // Calidad de imagen por defecto para las fotos de hallazgos (Docs/tecnica.md §4).
+  await prisma.configuracion.upsert({
+    where: { clave: 'calidad_imagen_default' },
+    update: {},
+    create: { clave: 'calidad_imagen_default', valor: 'OPTIMIZADA' },
+  })
+}
+
 async function seedObras() {
   // Match del mockup "Tus obras". Idempotente por codigo (@unique).
   const obras: Array<{ codigo: string; nombre: string; comuna: string | null }> = [
@@ -346,6 +355,7 @@ async function main() {
   await seedEtapasConstructivas()
   await seedEtapasNido()
   await seedFormularios(prevencion.id, tecnica.id)
+  await seedConfiguracion()
   await seedObras()
   // El seed del admin es best-effort: un fallo acá NO debe abortar el arranque
   // del contenedor (el CMD encadena `seed && server`).

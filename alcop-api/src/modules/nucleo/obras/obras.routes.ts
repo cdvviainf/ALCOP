@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify'
-import { requireAdmin, requireAuth, requirePermiso } from '../../../plugins/auth-guard.js'
+import { requireAdmin, requireAlguno, requireAuth, requirePermiso } from '../../../plugins/auth-guard.js'
 import { obrasController } from './obras.controller.js'
 
 const leerObras = requirePermiso('OBRAS', 'LECTURA')
 const editarObras = requirePermiso('OBRAS', 'TOTAL')
+// Las unidades de lote las lee también el inspector técnico (selector de hallazgos).
+const leerUnidades = requireAlguno(['OBRAS', 'TEC_INSPECCION'], 'LECTURA')
 
 /**
  * Rutas de Obras — raíz del núcleo (Docs/nucleo-compartido.md). Montadas bajo
@@ -11,9 +13,11 @@ const editarObras = requirePermiso('OBRAS', 'TOTAL')
  * Titulares ("Permisos Obra"): solo Administrador (esAdmin).
  */
 export default async function obrasRoutes(app: FastifyInstance) {
+  // Lectura del listado: cualquier usuario autenticado (nucleo-compartido.md §95;
+  // alimenta selectores de obra, p. ej. Nueva visita técnica — QA-OLA-B-005).
   app.get(
     '/obras',
-    { preHandler: [requireAuth, leerObras], schema: { tags: ['nucleo'], summary: 'Listar obras (paginado)' } },
+    { preHandler: [requireAuth], schema: { tags: ['nucleo'], summary: 'Listar obras (paginado)' } },
     obrasController.listar
   )
   app.get(
@@ -75,6 +79,13 @@ export default async function obrasRoutes(app: FastifyInstance) {
     '/obras/:id/lotes/:loteId',
     { preHandler: [requireAuth, editarObras], schema: { tags: ['nucleo'], summary: 'Quitar lote de la obra' } },
     obrasController.quitarLote
+  )
+
+  // Unidades de lote de la obra (autogeneradas; para el selector de hallazgos).
+  app.get(
+    '/obras/:id/unidades',
+    { preHandler: [requireAuth, leerUnidades], schema: { tags: ['nucleo'], summary: 'Listar unidades de lote de la obra' } },
+    obrasController.listarUnidades
   )
 
   // Formularios de control aplicables a la obra (derivado de la cadena de lotes).

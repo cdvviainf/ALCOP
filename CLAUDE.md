@@ -291,6 +291,10 @@ CORS_ORIGIN=http://localhost:3010
 
 # Motor de Documentos (PDF) — Playwright.
 PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+# Límites de subida (MB): el multipart usa el mayor como tope; cada recurso valida el suyo.
+PROCEDIMIENTO_PDF_MAX_MB=20
+IMAGEN_MAX_MB=25
 ```
 
 ### alcop-web (.env.local)

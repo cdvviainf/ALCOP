@@ -19,8 +19,11 @@ const envSchema = z.object({
   SEED_ADMIN_PASSWORD: z.string().min(8).optional(),
   // Motor de Documentos (PDF) — Playwright / Chromium del sistema (ver Dockerfile).
   PLAYWRIGHT_EXECUTABLE_PATH: z.string().optional(),
-  // Tamaño máximo del PDF de un procedimiento, en MB (se guarda en BD como bytea).
+  // Límites de subida por tipo de recurso, en MB (el multipart usa el mayor de
+  // los dos como tope de transporte; cada recurso valida el suyo).
   PROCEDIMIENTO_PDF_MAX_MB: z.coerce.number().int().positive().default(20),
+  // Foto de hallazgo (tope de entrada; luego se optimiza con sharp). Docs/tecnica.md §6.
+  IMAGEN_MAX_MB: z.coerce.number().int().positive().default(25),
 })
 
 // Validación al arrancar (CLAUDE.md §12.9): si falta una variable crítica,

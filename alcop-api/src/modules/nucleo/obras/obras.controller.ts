@@ -96,4 +96,9 @@ export const obrasController = {
     const { id } = obraIdParamSchema.parse(request.params)
     return reply.send({ data: await obrasService.formulariosAplicables(id) })
   },
+
+  async listarUnidades(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = obraIdParamSchema.parse(request.params)
+    return reply.send({ data: await obrasService.listarUnidades(id) })
+  },
 }
