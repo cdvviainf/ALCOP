@@ -1,16 +1,19 @@
-import sharp from 'sharp'
+import Jimp from 'jimp'
 import type { CalidadImagen } from '@prisma/client'
 
 /**
- * Optimización de imágenes de hallazgos (Docs/tecnica.md §4, dec. #2). Cada foto
- * se guarda EN LA BD a la calidad elegida; `sharp` redimensiona y comprime para
- * evitar grandes volúmenes. `ORIGINAL` conserva los bytes (solo recorta si excede
- * un tope de seguridad); el resto re-encodea a JPEG (mozjpeg) con calidad decreciente.
+ * Optimización de imágenes de hallazgos (Docs/tecnica.md §4, dec. #2). Cada foto se
+ * guarda EN LA BD a la calidad elegida; se redimensiona y comprime para evitar
+ * grandes volúmenes. Se usa `jimp` (JavaScript puro) en lugar de `sharp`: el
+ * servidor de despliegue tiene un CPU sin x86-64-v2 y los binarios prebuilt de
+ * sharp 0.33+ (y su fallback WASM-SIMD) lo requieren. jimp no tiene binario nativo.
+ * `ORIGINAL` conserva los bytes (solo recorta si excede el tope); el resto re-encodea
+ * a JPEG con calidad decreciente.
  */
 
 interface Preset {
   maxDim: number
-  /** null = conservar codificación original (solo tope de dimensiones). */
+  /** null = conservar bytes originales (solo tope de dimensiones). */
   jpegQuality: number | null
 }
 
@@ -29,24 +32,11 @@ export interface ImagenOptimizada {
   alto: number | null
 }
 
-function mimeDeFormato(format: string): string {
-  const map: Record<string, string> = {
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    webp: 'image/webp',
-    gif: 'image/gif',
-    tiff: 'image/tiff',
-    avif: 'image/avif',
-    heif: 'image/heif',
-  }
-  return map[format] ?? 'application/octet-stream'
-}
-
-/** ¿El buffer es una imagen válida decodificable por sharp? */
+/** ¿El buffer es una imagen decodificable? */
 export async function esImagenValida(entrada: Buffer): Promise<boolean> {
   try {
-    const meta = await sharp(entrada).metadata()
-    return Boolean(meta.width && meta.height && meta.format)
+    await Jimp.read(entrada)
+    return true
   } catch {
     return false
   }
@@ -54,41 +44,31 @@ export async function esImagenValida(entrada: Buffer): Promise<boolean> {
 
 export async function optimizarImagen(entrada: Buffer, calidad: CalidadImagen): Promise<ImagenOptimizada> {
   const preset = PRESETS[calidad]
-  const metaIn = await sharp(entrada).metadata()
-  if (!metaIn.width || !metaIn.height || !metaIn.format) {
+  let image: Jimp
+  try {
+    image = await Jimp.read(entrada)
+  } catch {
     throw new Error('El archivo no es una imagen válida.')
   }
+  const w = image.getWidth()
+  const h = image.getHeight()
 
   // ORIGINAL dentro del tope: se conservan los bytes tal cual.
-  if (preset.jpegQuality === null && metaIn.width <= preset.maxDim && metaIn.height <= preset.maxDim) {
-    return {
-      buffer: entrada,
-      mimetype: mimeDeFormato(metaIn.format),
-      tamano: entrada.length,
-      ancho: metaIn.width,
-      alto: metaIn.height,
-    }
+  if (preset.jpegQuality === null && w <= preset.maxDim && h <= preset.maxDim) {
+    return { buffer: entrada, mimetype: image.getMIME(), tamano: entrada.length, ancho: w, alto: h }
   }
 
-  // `rotate()` sin args auto-orienta según EXIF (fotos de teléfono).
-  let pipeline = sharp(entrada)
-    .rotate()
-    .resize(preset.maxDim, preset.maxDim, { fit: 'inside', withoutEnlargement: true })
-  let mimetype: string
-  if (preset.jpegQuality === null) {
-    // ORIGINAL que excede el tope: redimensiona conservando formato.
-    mimetype = mimeDeFormato(metaIn.format)
-  } else {
-    pipeline = pipeline.jpeg({ quality: preset.jpegQuality, mozjpeg: true })
-    mimetype = 'image/jpeg'
+  if (w > preset.maxDim || h > preset.maxDim) {
+    // scaleToFit mantiene el aspecto y encaja dentro del tope.
+    image.scaleToFit(preset.maxDim, preset.maxDim)
   }
-  const buffer = await pipeline.toBuffer()
-  const metaOut = await sharp(buffer).metadata()
+  image.quality(preset.jpegQuality ?? 90)
+  const buffer = await image.getBufferAsync(Jimp.MIME_JPEG)
   return {
     buffer,
-    mimetype,
+    mimetype: 'image/jpeg',
     tamano: buffer.length,
-    ancho: metaOut.width ?? null,
-    alto: metaOut.height ?? null,
+    ancho: image.getWidth(),
+    alto: image.getHeight(),
   }
 }

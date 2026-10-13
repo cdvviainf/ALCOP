@@ -127,7 +127,7 @@ model Configuracion {
 ### Decisiones cerradas (13-10-2026)
 
 1. **Lote = unidad individual autogenerada**: al configurar `ObraLote` (cantidad N de un tipo), el sistema genera N `LoteUnidad` con `descripcion = "<TipoLote.nombre> <correlativo>"` (correlativo con padding a 3, p. ej. `Casa 001`). El hallazgo referencia una `LoteUnidad`.
-2. **Fotos en BD + optimización**: se guardan en BD (bytea) con `sharp`, una rendición por foto a la **calidad elegida al subir**. Presets: Original (tope ~4000px, sin recomprimir), Optimizada (~2000px/q82, **default sugerido**), Media (~1280px/q70), Baja (~800px/q55). El default sale de `Configuracion.calidad_imagen_default` y viene preseleccionado; el usuario puede cambiarlo por foto.
+2. **Fotos en BD + optimización**: se guardan en BD (bytea) con `jimp` (JS puro; sharp no corre en el CPU del servidor), una rendición por foto a la **calidad elegida al subir**. Presets: Original (tope ~4000px, sin recomprimir), Optimizada (~2000px/q82, **default sugerido**), Media (~1280px/q70), Baja (~800px/q55). El default sale de `Configuracion.calidad_imagen_default` y viene preseleccionado; el usuario puede cambiarlo por foto.
 3. **Reporte HTML → PDF**: pantalla de reporte (secciones fijas) + exportar a PDF (Playwright renderiza el HTML). Imágenes embebidas como data URI en el PDF (self-contained).
 4. **Alcance**: solo visita → hallazgos → reporte. Sin ciclo de corrección, sin nidos/puntales, sin IA (hook/campo listos para después).
 
@@ -152,7 +152,7 @@ model Configuracion {
 - **Autorización**: visitas/hallazgos/fotos → `requirePermiso('TEC_INSPECCION', 'LECTURA'|'TOTAL')`; `esAdmin` todo. Config de imagen: **cambiar** la calidad por defecto → `requireAdmin`; **consultarla** → cualquier usuario autenticado (para preselección al subir fotos — QA-OLA-B-001). Los selectores que alimenta el módulo (obras, tipos de hallazgo) son legibles por `TEC_INSPECCION` aunque sean de otra función (QA-OLA-B-005): el listado de obras lo lee cualquier autenticado (nucleo-compartido.md §95) y el de tipos de hallazgo se abre a `TEC_CAT_TIPOS_HALLAZGO | TEC_INSPECCION`.
 - **Generación de unidades**: `descripcion` con padding a 3 (o al ancho de la cantidad si supera 999). Autogenerada; no editable a mano en esta ola.
 - **Edición**: solo visitas `EN_CURSO` se editan (agregar/quitar hallazgos, subir/borrar fotos). `FINALIZADA` = solo lectura (el reporte sigue disponible).
-- **Fotos**: solo imágenes (`image/*`); se optimizan con `sharp` según la calidad elegida; se guarda el binario en BD + metadata. Límite de tamaño de entrada configurable (default 25 MB antes de optimizar).
+- **Fotos**: solo imágenes (`image/*`); se optimizan con `jimp` según la calidad elegida; se guarda el binario en BD + metadata. Límite de tamaño de entrada configurable (default 25 MB antes de optimizar).
 - **Borrado**: soft-delete de visita/hallazgo; el binario de fotos se borra en cascada lógica (al borrar el hallazgo, sus fotos quedan inaccesibles). No hay `DELETE` físico de la visita.
 - **No bloquear por procedimientos**: este módulo no consulta Procedimientos/Formularios.
 
@@ -172,7 +172,7 @@ model Configuracion {
 - **ObraLote / TipoLote** (lotes-procedimientos.md): origen de las `LoteUnidad`.
 - **TipoHallazgoTecnico**: catálogo del tipo de hallazgo (ya existe).
 - **Playwright**: motor HTML→PDF del reporte (ya en el stack; Chromium en el Dockerfile).
-- **sharp**: optimización de imagen (nueva dependencia — verificar build Alpine/musl).
+- **jimp**: optimización de imagen (JavaScript puro, sin binario nativo — reemplazó a sharp porque el CPU del servidor no soporta x86-64-v2).
 - **Análisis IA** (futuro): el `comentario` del hallazgo se autogenerará desde la foto vía el adaptador `analisis-ia.adapter.ts`.
 - **Reportes/Alertas**: a futuro, el reporte de visita puede alimentar notificaciones por obra.
 
@@ -182,6 +182,6 @@ model Configuracion {
 - [ ] ¿`resumenFinal` obligatorio para finalizar? (hoy: recomendado).
 - [ ] ¿Reapertura de visitas `FINALIZADA`?
 - [ ] Búsqueda/paginación en el selector de unidad de lote (una obra puede tener cientos de unidades).
-- [ ] Verificar `sharp` en el build Docker (Alpine/musl, `--ignore-scripts`); fallback `jimp` si falla.
+- [x] `sharp` fallaba en el servidor (CPU sin x86-64-v2) → se usa `jimp` (JS puro), funciona en cualquier CPU. Menor compresión que sharp; aceptable para Etapa 1. Nota: jimp no decodifica HEIC/WebP (los navegadores suelen entregar JPEG al subir).
 - [ ] Prevención (Visita Prevención) reusando este motor con catálogo `NivelRiesgo` — ola aparte.
 - [ ] Nidos/puntales (hitos) y ciclo de corrección — ola aparte.

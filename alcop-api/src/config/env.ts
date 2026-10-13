@@ -22,7 +22,7 @@ const envSchema = z.object({
   // Límites de subida por tipo de recurso, en MB (el multipart usa el mayor de
   // los dos como tope de transporte; cada recurso valida el suyo).
   PROCEDIMIENTO_PDF_MAX_MB: z.coerce.number().int().positive().default(20),
-  // Foto de hallazgo (tope de entrada; luego se optimiza con sharp). Docs/tecnica.md §6.
+  // Foto de hallazgo (tope de entrada; luego se optimiza con jimp). Docs/tecnica.md §6.
   IMAGEN_MAX_MB: z.coerce.number().int().positive().default(25),
 })
 
