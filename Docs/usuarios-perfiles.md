@@ -91,20 +91,23 @@ enum NivelAcceso {
   TOTAL
 }
 
-// Asignación de un usuario a una obra con un rol de notificación.
-// Un usuario puede aparecer en varias obras; una obra tiene exactamente
-// un Administrador, un Jefe de Terreno y un Prevencionista asignados
-// (regla de negocio — ver §6).
+// ACCESO usuario↔obra (22-10-2026): pertenencia pura, SIN rol — define quién
+// puede entrar a la obra. Modelo definitivo + auditoría en `nucleo-compartido.md §4`.
 model UsuarioObra {
-  id            Int      @id @default(autoincrement())
-  usuarioId     String
-  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
-  obraId        Int
-  obra          Obra     @relation(fields: [obraId], references: [id])
-  rolObra       RolObra
-  creadoEn      DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  usuarioId String
+  obraId    Int
+  // (+ auditoría/soft-delete; unicidad (obraId, usuarioId) por índice parcial)
+}
 
-  @@unique([obraId, rolObra]) // una obra solo puede tener un titular por rol a la vez
+// TITULAR por rol (22-10-2026): un usuario por RolObra por obra, elegido entre
+// los que tienen acceso. Reemplaza el `rolObra` que antes vivía en UsuarioObra.
+model ObraTitular {
+  id        Int      @id @default(autoincrement())
+  obraId    Int
+  rolObra   RolObra
+  usuarioId String
+  // (+ auditoría/soft-delete; unicidad (obraId, rolObra) por índice parcial)
 }
 
 enum RolObra {
@@ -114,12 +117,12 @@ enum RolObra {
 }
 ```
 
-> `Obra` se especifica en `nucleo-compartido.md` — aquí solo se referencia por FK.
+> `Obra`, `UsuarioObra` y `ObraTitular` se especifican en detalle en `nucleo-compartido.md §4` — aquí se referencian. **Acceso ≠ titular:** el titular de un rol se elige solo entre los usuarios con acceso a la obra.
 
 ## 5. Flujos
 
 1. **Login** — Better Auth, sesión por cookie/JWT. Al autenticar, el frontend pide `GET /api/usuarios/me` → devuelve `esAdmin` + el mapa de permisos efectivos por función, para construir el sidebar (cada ítem visible si su función ≥ `LECTURA`; `esAdmin` ve todo).
-2. **Asignación a obra** — un Administrador (`esAdmin`) asigna/reemplaza los titulares (varios por `RolObra`) por obra desde "Permisos Obra". Reemplazar un titular no elimina el historial de notificaciones ya enviadas.
+2. **Asignación a obra** — un Administrador (`esAdmin`) da **acceso** a los usuarios de la obra y asigna **un titular por `RolObra`** (elegido entre los con acceso) desde "Permisos Obra". Reemplazar un titular no elimina el historial de notificaciones ya enviadas.
 3. **Notificación automática** — cuando se guarda un Hallazgo, una Visita (Prevención o Técnica) o un informe de Análisis IA, el sistema busca los `UsuarioObra` de esa obra y envía el correo a los 3 roles asignados (alcop-esquema.html §06/07).
 
 ## 6. Reglas

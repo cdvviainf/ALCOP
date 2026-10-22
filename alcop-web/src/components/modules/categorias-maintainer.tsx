@@ -82,7 +82,14 @@ function baseColumns(mostrarArea: boolean): CrudColumn<Categoria>[] {
  * la lista se filtra a esa área y el alta queda fijada a ella; si no, muestra
  * todas las áreas accesibles del usuario (filtro server-side).
  */
-export function CategoriasMaintainer({ area }: { area?: 'PREVENCION' | 'TECNICA' }) {
+export function CategoriasMaintainer({
+  area,
+  descripcion,
+}: {
+  area?: 'PREVENCION' | 'TECNICA'
+  /** Override del texto descriptivo (p. ej. en Prevención son clasificación de hallazgos). */
+  descripcion?: string
+}) {
   const { data: areasResp, isLoading } = useQuery({
     queryKey: ['areas'],
     queryFn: () => api.get('nucleo/areas').json<{ data: Area[] }>(),
@@ -122,7 +129,10 @@ export function CategoriasMaintainer({ area }: { area?: 'PREVENCION' | 'TECNICA'
   return (
     <CrudMaintainer<Categoria, FormValues>
       titulo={titulo}
-      descripcion="Agrupación temática de formularios por área. Se administran con nivel TOTAL en el área de la categoría."
+      descripcion={
+        descripcion ??
+        'Agrupación temática por área. Se administran con nivel TOTAL en el área de la categoría.'
+      }
       endpoint="nucleo/categorias-formulario"
       queryKey={`categorias-formulario${areaFija ? `-${areaFija.codigo}` : ''}`}
       extraParams={extraParams}

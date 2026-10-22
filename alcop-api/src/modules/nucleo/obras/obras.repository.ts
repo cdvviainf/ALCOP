@@ -70,20 +70,99 @@ export const obrasRepository = {
     })
   },
 
-  async softDelete(id: number, eliminadoPor: string) {
-    return prisma.obra.update({
+  async softDelete(id: number, eliminadoPor: string, db: DbClient = prisma) {
+    return db.obra.update({
       where: { id },
       data: { eliminadoEn: new Date(), eliminadoPor },
     })
   },
 
-  async contarRespuestas(obraId: number) {
-    return prisma.respuestaFormulario.count({ where: { obraId } })
+  /** Bloquea la fila de la obra viva (FOR UPDATE) — serializa borrar-obra vs crear-visita. */
+  async lockObraViva(tx: Prisma.TransactionClient, id: number): Promise<boolean> {
+    const rows = await tx.$queryRaw<
+      Array<{ id: number }>
+    >`SELECT id FROM "Obra" WHERE id = ${id} AND "eliminadoEn" IS NULL FOR UPDATE`
+    return rows.length > 0
   },
 
-  // ─── Titulares ──────────────────────────────────────────────────────────
-  async listarTitulares(obraId: number) {
+  /** Inspecciones de cualquier clase ligadas a la obra, INCLUIDAS las soft-deleted
+   *  (si alguna vez tuvo inspecciones, la obra no se elimina — QA-OKA-017). */
+  async contarInspecciones(obraId: number, db: DbClient = prisma) {
+    const respuestas = await db.respuestaFormulario.count({ where: { obraId } })
+    const visitasTec = await db.visitaTecnica.count({ where: { obraId } })
+    const visitasPrev = await db.visitaPrevencion.count({ where: { obraId } })
+    return respuestas + visitasTec + visitasPrev
+  },
+
+  // ─── Acceso usuario↔obra (UsuarioObra) ────────────────────────────────────
+  async listarAccesos(obraId: number) {
     return prisma.usuarioObra.findMany({
+      where: { obraId, eliminadoEn: null },
+      orderBy: [{ usuario: { nombre: 'asc' } }, { id: 'asc' }],
+      include: titularInclude,
+    })
+  },
+
+  async buscarAcceso(id: number) {
+    return prisma.usuarioObra.findFirst({ where: { id, eliminadoEn: null }, include: titularInclude })
+  },
+
+  async tieneAcceso(obraId: number, usuarioId: string, db: DbClient = prisma) {
+    const row = await db.usuarioObra.findFirst({ where: { obraId, usuarioId, eliminadoEn: null }, select: { id: true } })
+    return row !== null
+  },
+
+  /**
+   * Bloquea (FOR UPDATE) la fila de acceso viva de (obra, usuario) y devuelve si
+   * existe. Serializa asignar-titular vs. revocar-acceso sobre la misma fila
+   * (QA-OKA-016), evitando dejar un titular sin acceso vigente.
+   */
+  async lockAccesoVivo(tx: Prisma.TransactionClient, obraId: number, usuarioId: string): Promise<boolean> {
+    const rows = await tx.$queryRaw<
+      Array<{ id: number }>
+    >`SELECT id FROM "UsuarioObra" WHERE "obraId" = ${obraId} AND "usuarioId" = ${usuarioId} AND "eliminadoEn" IS NULL FOR UPDATE`
+    return rows.length > 0
+  },
+
+  /** Concede acceso; revive la fila si existía retirada (índice único parcial). */
+  async agregarAcceso(obraId: number, usuarioId: string, creadoPor: string) {
+    const existente = await prisma.usuarioObra.findFirst({ where: { obraId, usuarioId } })
+    if (existente) {
+      return prisma.usuarioObra.update({
+        where: { id: existente.id },
+        data: { eliminadoEn: null, eliminadoPor: null, actualizadoPor: creadoPor },
+        include: titularInclude,
+      })
+    }
+    return prisma.usuarioObra.create({ data: { obraId, usuarioId, creadoPor }, include: titularInclude })
+  },
+
+  async softDeleteAcceso(id: number, eliminadoPor: string, db: DbClient = prisma) {
+    return db.usuarioObra.update({ where: { id }, data: { eliminadoEn: new Date(), eliminadoPor } })
+  },
+
+  /** Usuario activo + ¿tiene acceso a la obra? + área del perfil (para titular). */
+  async buscarUsuarioConAcceso(obraId: number, usuarioId: string, db: DbClient = prisma) {
+    const usuario = await db.usuario.findFirst({
+      where: { id: usuarioId, eliminadoEn: null, activo: true },
+      select: {
+        id: true,
+        esAdmin: true,
+        perfil: { select: { areaPrevencion: true, areaTecnica: true } },
+      },
+    })
+    if (!usuario) return null
+    const acceso = await db.usuarioObra.findFirst({ where: { obraId, usuarioId, eliminadoEn: null }, select: { id: true } })
+    return { ...usuario, tieneAcceso: acceso !== null }
+  },
+
+  async usuarioActivo(usuarioId: string) {
+    return prisma.usuario.findFirst({ where: { id: usuarioId, eliminadoEn: null, activo: true }, select: { id: true } })
+  },
+
+  // ─── Titulares por rol (ObraTitular) ──────────────────────────────────────
+  async listarTitulares(obraId: number) {
+    return prisma.obraTitular.findMany({
       where: { obraId, eliminadoEn: null },
       orderBy: [{ rolObra: 'asc' }, { id: 'asc' }],
       include: titularInclude,
@@ -91,52 +170,36 @@ export const obrasRepository = {
   },
 
   async buscarTitular(id: number) {
-    return prisma.usuarioObra.findFirst({ where: { id, eliminadoEn: null }, include: titularInclude })
+    return prisma.obraTitular.findFirst({ where: { id, eliminadoEn: null }, include: titularInclude })
   },
 
-  async existeTitular(obraId: number, rolObra: RolObra, usuarioId: string) {
-    const existente = await prisma.usuarioObra.findFirst({
-      where: { obraId, rolObra, usuarioId, eliminadoEn: null },
-      select: { id: true },
-    })
-    return existente !== null
+  /** Titular VIVO de un rol en la obra (hay a lo más uno — índice único parcial). */
+  async titularVivoDeRol(obraId: number, rolObra: RolObra, db: DbClient = prisma) {
+    return db.obraTitular.findFirst({ where: { obraId, rolObra, eliminadoEn: null }, include: titularInclude })
   },
 
-  async crearTitular(obraId: number, rolObra: RolObra, usuarioId: string, creadoPor: string) {
-    // El @@unique([obraId, rolObra, usuarioId]) incluye las filas soft-deleted:
-    // si existe una asignación previa (retirada), se revive en vez de insertar
-    // (evita el P2002 — OBR-001).
-    const existente = await prisma.usuarioObra.findFirst({ where: { obraId, rolObra, usuarioId } })
+  async softDeleteTitular(id: number, eliminadoPor: string, db: DbClient = prisma) {
+    return db.obraTitular.update({ where: { id }, data: { eliminadoEn: new Date(), eliminadoPor } })
+  },
+
+  /** Crea/revive el titular (obra, rol, usuario). El caller ya liberó el rol. */
+  async crearTitular(obraId: number, rolObra: RolObra, usuarioId: string, creadoPor: string, db: DbClient = prisma) {
+    const existente = await db.obraTitular.findFirst({ where: { obraId, rolObra, usuarioId } })
     if (existente) {
-      // Reactivación: conserva creadoEn/creadoPor originales; el actor queda en
-      // actualizadoPor (actualizadoEn lo pone @updatedAt). OBR-008.
-      return prisma.usuarioObra.update({
+      return db.obraTitular.update({
         where: { id: existente.id },
         data: { eliminadoEn: null, eliminadoPor: null, actualizadoPor: creadoPor },
         include: titularInclude,
       })
     }
-    return prisma.usuarioObra.create({
-      data: { obraId, rolObra, usuarioId, creadoPor },
-      include: titularInclude,
-    })
+    return db.obraTitular.create({ data: { obraId, rolObra, usuarioId, creadoPor }, include: titularInclude })
   },
 
-  async softDeleteTitular(id: number, eliminadoPor: string) {
-    return prisma.usuarioObra.update({
-      where: { id },
+  /** Al revocar acceso, retira (soft) cualquier titularidad viva de ese usuario en la obra. */
+  async softDeleteTitularesDeUsuario(obraId: number, usuarioId: string, eliminadoPor: string, db: DbClient = prisma) {
+    await db.obraTitular.updateMany({
+      where: { obraId, usuarioId, eliminadoEn: null },
       data: { eliminadoEn: new Date(), eliminadoPor },
-    })
-  },
-
-  async buscarUsuarioParaTitular(usuarioId: string) {
-    return prisma.usuario.findFirst({
-      where: { id: usuarioId, eliminadoEn: null, activo: true },
-      select: {
-        id: true,
-        esAdmin: true,
-        perfil: { select: { areaPrevencion: true, areaTecnica: true } },
-      },
     })
   },
 

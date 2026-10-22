@@ -16,6 +16,9 @@ import {
 } from './visitas.schema.js'
 import { visitasService } from './visitas.service.js'
 
+/** Máximo de fotos por alta de hallazgo (override del límite global `files: 1`). */
+const MAX_FOTOS_ALTA = 10
+
 /** Extrae campos + el (único) archivo de un request multipart (foto del hallazgo). */
 async function parseMultipart(
   request: FastifyRequest
@@ -37,6 +40,42 @@ async function parseMultipart(
     }
   }
   return { campos, archivo }
+}
+
+/** Variante multi-archivo para el alta de hallazgo (fotos son parte del hallazgo). */
+async function parseMultipartMulti(
+  request: FastifyRequest
+): Promise<{ campos: Record<string, string>; archivos: Buffer[] }> {
+  if (!request.isMultipart()) {
+    throw new BusinessError('CONTENT_TYPE_INVALIDO', 'El contenido debe enviarse como multipart/form-data.', 415)
+  }
+  const campos: Record<string, string> = {}
+  const archivos: Buffer[] = []
+  try {
+    for await (const part of request.parts({ limits: { files: MAX_FOTOS_ALTA } })) {
+      if (part.type === 'file') {
+        const buffer = await part.toBuffer()
+        if (part.file.truncated) {
+          throw new BusinessError('ARCHIVO_DEMASIADO_GRANDE', 'La imagen supera el tamaño máximo permitido.', 413)
+        }
+        if (buffer.length > 0) archivos.push(buffer)
+      } else {
+        campos[part.fieldname] = String(part.value)
+      }
+    }
+  } catch (err) {
+    if (err instanceof BusinessError) throw err
+    // Errores de @fastify/multipart (p. ej. exceso de archivos) → 4xx tipado en vez de 500.
+    const code = (err as { code?: string }).code
+    if (code === 'FST_FILES_LIMIT') {
+      throw new BusinessError('DEMASIADAS_FOTOS', `Máximo ${MAX_FOTOS_ALTA} fotos por registro.`, 413)
+    }
+    if (code === 'FST_REQ_FILE_TOO_LARGE') {
+      throw new BusinessError('ARCHIVO_DEMASIADO_GRANDE', 'La imagen supera el tamaño máximo permitido.', 413)
+    }
+    throw err
+  }
+  return { campos, archivos }
 }
 
 /** Controladores thin (CLAUDE.md §12.5). */
@@ -94,8 +133,17 @@ export const visitasController = {
   async agregarHallazgo(request: FastifyRequest, reply: FastifyReply) {
     if (!request.usuarioId) throw new UnauthorizedError()
     const { id } = visitaIdParamSchema.parse(request.params)
-    const data = crearHallazgoSchema.parse(request.body)
-    return reply.status(201).send(await visitasService.agregarHallazgo(id, data))
+    // Las fotos viajan en el mismo alta (multipart): campos + archivos `imagen`.
+    const { campos, archivos } = await parseMultipartMulti(request)
+    const data = crearHallazgoSchema.parse({
+      loteUnidadId: campos.loteUnidadId,
+      tipoRegistro: campos.tipoRegistro,
+      tipoHallazgoId: campos.tipoHallazgoId || undefined,
+      comentario: campos.comentario,
+    })
+    let calidad: CalidadImagen | null = null
+    if (campos.calidad) calidad = calidadImagenSchema.parse(campos.calidad)
+    return reply.status(201).send(await visitasService.agregarHallazgo(id, data, archivos, calidad))
   },
 
   async actualizarHallazgo(request: FastifyRequest, reply: FastifyReply) {

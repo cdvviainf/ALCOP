@@ -165,10 +165,14 @@ export const visitasService = {
   },
 
   async crear(data: CrearVisitaInput, usuarioId: string): Promise<VisitaDetalleDTO> {
-    const obra = await visitasRepository.obraExiste(data.obraId)
-    if (!obra) throw new NotFoundError('Obra', String(data.obraId))
-    const row = await visitasRepository.crear(data, usuarioId)
-    return detalleToDTO(row)
+    // Lock de la obra (FOR UPDATE) para no crear la visita si la obra se elimina
+    // en paralelo (QA-OKA-018).
+    return prisma.$transaction(async (tx) => {
+      const viva = await visitasRepository.lockObraViva(tx, data.obraId)
+      if (!viva) throw new NotFoundError('Obra', String(data.obraId))
+      const row = await visitasRepository.crear(data, usuarioId, tx)
+      return detalleToDTO(row)
+    })
   },
 
   async actualizar(id: number, data: ActualizarVisitaInput, actualizadoPor: string): Promise<VisitaDetalleDTO> {
@@ -217,7 +221,33 @@ export const visitasService = {
   },
 
   // ─── Hallazgos ─────────────────────────────────────────────────────────────
-  async agregarHallazgo(visitaId: number, data: CrearHallazgoInput): Promise<HallazgoDTO> {
+  async agregarHallazgo(
+    visitaId: number,
+    data: CrearHallazgoInput,
+    archivos: Buffer[],
+    calidad: CalidadImagen | null
+  ): Promise<HallazgoDTO> {
+    // Las fotos son parte del alta del hallazgo (Docs/tecnica.md, item 2). Un
+    // HALLAZGO exige ≥1 foto desde el ingreso; una NOTA_TECNICA la hace opcional.
+    if (data.tipoRegistro === 'HALLAZGO' && archivos.length === 0) {
+      throw new BusinessError('FOTO_REQUERIDA', 'Un hallazgo requiere al menos una foto.', 422)
+    }
+    // Validación + optimización FUERA del lock (CPU-heavy; no sostener la transacción).
+    const calidadEf = calidad ?? (await configuracionService.obtenerCalidadImagen())
+    const optimizadas: Array<Awaited<ReturnType<typeof optimizarImagen>>> = []
+    for (const buffer of archivos) {
+      if (!buffer || buffer.length === 0) {
+        throw new BusinessError('ARCHIVO_REQUERIDO', 'Una de las imágenes está vacía.', 422)
+      }
+      if (buffer.length > env.IMAGEN_MAX_MB * 1024 * 1024) {
+        throw new BusinessError('ARCHIVO_DEMASIADO_GRANDE', `La imagen supera el límite de ${env.IMAGEN_MAX_MB} MB.`, 413)
+      }
+      if (!(await esImagenValida(buffer))) {
+        throw new BusinessError('ARCHIVO_INVALIDO', 'Uno de los archivos no es una imagen válida.', 422)
+      }
+      optimizadas.push(await optimizarImagen(buffer, calidadEf))
+    }
+
     return prisma.$transaction(async (tx) => {
       const { obraId } = await lockVisitaEnCurso(tx, visitaId)
       const unidad = await visitasRepository.loteUnidadDeObra(data.loteUnidadId, obraId, tx)
@@ -231,13 +261,24 @@ export const visitasService = {
         tipoHallazgoId = data.tipoHallazgoId
       }
       const orden = await visitasRepository.contarHallazgos(visitaId, tx)
-      const row = await visitasRepository.crearHallazgo(
+      const creado = await visitasRepository.crearHallazgo(
         visitaId,
         { loteUnidadId: data.loteUnidadId, tipoRegistro: data.tipoRegistro, tipoHallazgoId, comentario: data.comentario },
         orden,
         tx
       )
-      return hallazgoToDTO(row)
+      for (let i = 0; i < optimizadas.length; i++) {
+        const o = optimizadas[i]
+        await visitasRepository.crearFoto(
+          creado.id,
+          { mimetype: o.mimetype, calidad: calidadEf, tamano: o.tamano, ancho: o.ancho, alto: o.alto },
+          i,
+          o.buffer,
+          tx
+        )
+      }
+      const detalle = await visitasRepository.buscarHallazgoDetalle(creado.id, tx)
+      return hallazgoToDTO(detalle!)
     })
   },
 

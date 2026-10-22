@@ -151,7 +151,12 @@ export const usuariosRepository = {
 
   async retirar(id: string, eliminar: boolean, eliminadoPor: string) {
     return prisma.$transaction(async (tx) => {
+      // Al retirar al usuario se retira su acceso a obras y cualquier titularidad.
       await tx.usuarioObra.updateMany({
+        where: { usuarioId: id, eliminadoEn: null },
+        data: { eliminadoEn: new Date(), eliminadoPor },
+      })
+      await tx.obraTitular.updateMany({
         where: { usuarioId: id, eliminadoEn: null },
         data: { eliminadoEn: new Date(), eliminadoPor },
       })

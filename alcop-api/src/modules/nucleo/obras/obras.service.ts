@@ -11,7 +11,7 @@ import type {
   AsignarTitularInput,
   CrearObraInput,
 } from './obras.schema.js'
-import type { FormularioAplicableDTO, ObraDTO, ObraLoteDTO, TitularDTO } from './obras.types.js'
+import type { AccesoObraDTO, FormularioAplicableDTO, ObraDTO, ObraLoteDTO, TitularDTO } from './obras.types.js'
 
 function toDTO(obra: Obra): ObraDTO {
   return {
@@ -42,6 +42,10 @@ function titularToDTO(row: TitularRow): TitularDTO {
     usuario: row.usuario,
     creadoEn: row.creadoEn.toISOString(),
   }
+}
+
+function accesoToDTO(row: { id: number; creadoEn: Date; usuario: { id: string; nombre: string; email: string } }): AccesoObraDTO {
+  return { id: row.id, usuario: row.usuario, creadoEn: row.creadoEn.toISOString() }
 }
 
 type LoteRow = {
@@ -197,18 +201,56 @@ export const obrasService = {
   async eliminar(id: number, eliminadoPor: string): Promise<void> {
     const existente = await obrasRepository.buscarPorId(id)
     if (!existente) throw new NotFoundError('Obra', String(id))
-    // Una obra con inspecciones registradas no se elimina (nucleo-compartido.md §6):
-    // se cambia su estado (p. ej. TERMINADA) en su lugar.
-    const respuestas = await obrasRepository.contarRespuestas(id)
-    if (respuestas > 0) {
-      throw new ConflictError(
-        `No se puede eliminar: la obra tiene ${respuestas} inspección(es) registrada(s). Cambia su estado (p. ej. a Terminada) en su lugar.`
-      )
-    }
-    await obrasRepository.softDelete(id, eliminadoPor)
+    // Conteo + borrado dentro de una transacción con lock de la fila (QA-OKA-018):
+    // serializa contra el alta concurrente de una visita sobre la misma obra. Una
+    // obra con inspecciones (incluso soft-deleted) no se elimina (QA-OKA-017).
+    await prisma.$transaction(async (tx) => {
+      const viva = await obrasRepository.lockObraViva(tx, id)
+      if (!viva) throw new NotFoundError('Obra', String(id))
+      const inspecciones = await obrasRepository.contarInspecciones(id, tx)
+      if (inspecciones > 0) {
+        throw new ConflictError(
+          `No se puede eliminar: la obra tiene ${inspecciones} inspección(es) registrada(s). Cambia su estado (p. ej. a Terminada) en su lugar.`
+        )
+      }
+      await obrasRepository.softDelete(id, eliminadoPor, tx)
+    })
   },
 
-  // ─── Titulares ──────────────────────────────────────────────────────────
+  // ─── Acceso usuario↔obra ──────────────────────────────────────────────────
+  async listarAccesos(obraId: number): Promise<AccesoObraDTO[]> {
+    const obra = await obrasRepository.buscarPorId(obraId)
+    if (!obra) throw new NotFoundError('Obra', String(obraId))
+    const rows = await obrasRepository.listarAccesos(obraId)
+    return rows.map(accesoToDTO)
+  },
+
+  async agregarAcceso(obraId: number, usuarioId: string, creadoPor: string): Promise<AccesoObraDTO> {
+    const obra = await obrasRepository.buscarPorId(obraId)
+    if (!obra) throw new NotFoundError('Obra', String(obraId))
+    const usuario = await obrasRepository.usuarioActivo(usuarioId)
+    if (!usuario) throw new NotFoundError('Usuario', usuarioId)
+    if (await obrasRepository.tieneAcceso(obraId, usuarioId)) {
+      throw new ConflictError('El usuario ya tiene acceso a esta obra.')
+    }
+    const row = await obrasRepository.agregarAcceso(obraId, usuarioId, creadoPor)
+    return accesoToDTO(row)
+  },
+
+  async quitarAcceso(obraId: number, accesoId: number, eliminadoPor: string): Promise<void> {
+    const acceso = await obrasRepository.buscarAcceso(accesoId)
+    if (!acceso || acceso.obraId !== obraId) throw new NotFoundError('Acceso', String(accesoId))
+    // Al revocar el acceso, el usuario deja de ser titular de cualquier rol en la
+    // obra. Se bloquea la misma fila de acceso (FOR UPDATE) para serializar contra
+    // una asignación de titular concurrente (QA-OKA-016).
+    await prisma.$transaction(async (tx) => {
+      await obrasRepository.lockAccesoVivo(tx, obraId, acceso.usuario.id)
+      await obrasRepository.softDeleteTitularesDeUsuario(obraId, acceso.usuario.id, eliminadoPor, tx)
+      await obrasRepository.softDeleteAcceso(accesoId, eliminadoPor, tx)
+    })
+  },
+
+  // ─── Titulares por rol ──────────────────────────────────────────────────
   async listarTitulares(obraId: number): Promise<TitularDTO[]> {
     const obra = await obrasRepository.buscarPorId(obraId)
     if (!obra) throw new NotFoundError('Obra', String(obraId))
@@ -216,21 +258,30 @@ export const obrasService = {
     return rows.map(titularToDTO)
   },
 
+  /** Asigna (o reemplaza) el titular de un rol. El usuario debe tener acceso a la obra. */
   async asignarTitular(obraId: number, data: AsignarTitularInput, creadoPor: string): Promise<TitularDTO> {
     const obra = await obrasRepository.buscarPorId(obraId)
     if (!obra) throw new NotFoundError('Obra', String(obraId))
 
-    const usuario = await obrasRepository.buscarUsuarioParaTitular(data.usuarioId)
-    if (!usuario) throw new NotFoundError('Usuario', data.usuarioId)
+    return prisma.$transaction(async (tx) => {
+      const usuario = await obrasRepository.buscarUsuarioConAcceso(obraId, data.usuarioId, tx)
+      if (!usuario) throw new NotFoundError('Usuario', data.usuarioId)
+      // Bloquea la fila de acceso (FOR UPDATE) y confirma que sigue viva: serializa
+      // contra una revocación concurrente (QA-OKA-016).
+      const accesoVivo = await obrasRepository.lockAccesoVivo(tx, obraId, data.usuarioId)
+      if (!accesoVivo) {
+        throw new BusinessError('SIN_ACCESO_OBRA', 'El usuario no tiene acceso a esta obra; concédelo antes de asignarlo como titular.', 422)
+      }
+      validarAccesoParaRol(data.rolObra, usuario)
 
-    validarAccesoParaRol(data.rolObra, usuario)
+      // Un titular por rol: si ya hay otro vivo en ese rol, se libera (reemplazo).
+      const actual = await obrasRepository.titularVivoDeRol(obraId, data.rolObra, tx)
+      if (actual && actual.usuario.id === data.usuarioId) return titularToDTO(actual)
+      if (actual) await obrasRepository.softDeleteTitular(actual.id, creadoPor, tx)
 
-    if (await obrasRepository.existeTitular(obraId, data.rolObra, data.usuarioId)) {
-      throw new ConflictError('Ese usuario ya está asignado a ese rol en la obra.')
-    }
-
-    const row = await obrasRepository.crearTitular(obraId, data.rolObra, data.usuarioId, creadoPor)
-    return titularToDTO(row)
+      const row = await obrasRepository.crearTitular(obraId, data.rolObra, data.usuarioId, creadoPor, tx)
+      return titularToDTO(row)
+    })
   },
 
   async quitarTitular(obraId: number, titularId: number, eliminadoPor: string): Promise<void> {

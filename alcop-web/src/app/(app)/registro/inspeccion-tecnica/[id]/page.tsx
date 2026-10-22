@@ -67,6 +67,8 @@ interface TipoHallazgo {
 }
 
 const CALIDADES = ['ORIGINAL', 'OPTIMIZADA', 'MEDIA', 'BAJA']
+// Tope de fotos por alta de hallazgo — debe coincidir con MAX_FOTOS_ALTA del backend.
+const MAX_FOTOS_ALTA = 10
 
 /** Etiqueta de grupo: las notas técnicas van juntas; los hallazgos por su tipo. */
 function etiquetaGrupo(h: Hallazgo): string {
@@ -332,34 +334,70 @@ function AgregarHallazgo({
   const [tipoRegistro, setTipoRegistro] = useState<TipoRegistro>('HALLAZGO')
   const [tipoId, setTipoId] = useState<string | undefined>(undefined)
   const [comentario, setComentario] = useState('')
+  const [archivos, setArchivos] = useState<File[]>([])
+
+  // Calidad por defecto del sistema, preseleccionada (QA-OLA-B-001); editable por alta.
+  const { data: config } = useQuery({
+    queryKey: ['config-calidad-imagen'],
+    queryFn: () => api.get('nucleo/configuracion/calidad-imagen').json<{ calidadImagenDefault: string }>(),
+    staleTime: 60_000,
+  })
+  const [calidadSel, setCalidadSel] = useState<string | null>(null)
+  // Valor a mostrar en el selector (sugerido del sistema); puede estar indefinido
+  // mientras carga la config. NO se usa para enviar: solo se manda `calidad` si el
+  // usuario la eligió explícitamente, para que el backend aplique su default
+  // autoritativo si no (QA-OKA-010).
+  const calidadMostrada = calidadSel ?? config?.calidadImagenDefault
 
   const esHallazgo = tipoRegistro === 'HALLAZGO'
-  // HALLAZGO: unidad + tipo + comentario (y foto, exigida al finalizar).
-  // NOTA_TECNICA: unidad + comentario (foto opcional). Comentario obligatorio en ambos.
-  const puedeAgregar = Boolean(loteUnidadId) && comentario.trim().length > 0 && (!esHallazgo || Boolean(tipoId))
+  // Las fotos son parte del alta (item 2): HALLAZGO exige unidad + tipo + comentario
+  // + ≥1 foto; NOTA_TECNICA exige unidad + comentario (foto opcional).
+  const puedeAgregar =
+    Boolean(loteUnidadId) &&
+    comentario.trim().length > 0 &&
+    (!esHallazgo || (Boolean(tipoId) && archivos.length > 0))
+
+  const resetear = () => {
+    setLoteUnidadId(undefined)
+    setTipoRegistro('HALLAZGO')
+    setTipoId(undefined)
+    setComentario('')
+    setArchivos([])
+    setCalidadSel(null)
+  }
 
   const crear = useMutation({
-    mutationFn: () =>
-      api
-        .post(`tecnica/visitas/${visitaId}/hallazgos`, {
-          json: {
-            loteUnidadId: Number(loteUnidadId),
-            tipoRegistro,
-            tipoHallazgoId: esHallazgo ? Number(tipoId) : null,
-            comentario: comentario.trim(),
-          },
-        })
-        .json(),
+    mutationFn: () => {
+      const fd = new FormData()
+      fd.append('loteUnidadId', String(Number(loteUnidadId)))
+      fd.append('tipoRegistro', tipoRegistro)
+      if (esHallazgo && tipoId) fd.append('tipoHallazgoId', tipoId)
+      fd.append('comentario', comentario.trim())
+      // Solo si el usuario eligió calidad; si no, el backend usa el default configurado.
+      if (calidadSel) fd.append('calidad', calidadSel)
+      archivos.forEach((f) => fd.append('imagen', f))
+      return api.post(`tecnica/visitas/${visitaId}/hallazgos`, { body: fd }).json()
+    },
     onSuccess: () => {
       toast.success(esHallazgo ? 'Hallazgo agregado.' : 'Nota técnica agregada.')
-      setLoteUnidadId(undefined)
-      setTipoRegistro('HALLAZGO')
-      setTipoId(undefined)
-      setComentario('')
+      resetear()
       onAdded()
     },
     onError: (err: Error) => toast.error(err.message || 'No se pudo agregar.'),
   })
+
+  const agregarArchivos = (files: FileList | null) => {
+    if (!files) return
+    setArchivos((prev) => {
+      const combinados = [...prev, ...Array.from(files)]
+      if (combinados.length > MAX_FOTOS_ALTA) {
+        toast.error(`Máximo ${MAX_FOTOS_ALTA} fotos por registro.`)
+        return combinados.slice(0, MAX_FOTOS_ALTA)
+      }
+      return combinados
+    })
+  }
+  const quitarArchivo = (i: number) => setArchivos((prev) => prev.filter((_, idx) => idx !== i))
 
   return (
     <div className="rounded-xl border border-dashed border-border bg-card p-5">
@@ -432,13 +470,67 @@ function AgregarHallazgo({
           placeholder="Comentario (obligatorio)"
           className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
-        {esHallazgo ? (
-          <p className="text-xs text-muted-foreground">
-            Un hallazgo requiere al menos una foto; se agrega abajo y se valida al finalizar.
-          </p>
-        ) : null}
       </div>
-      <div className="mt-3 flex justify-end">
+
+      {/* Fotos: parte del alta del hallazgo (item 2). Obligatoria ≥1 en HALLAZGO. */}
+      <div className="mt-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <Label>
+            Fotos{esHallazgo ? ' (al menos una)' : ' (opcional)'}
+          </Label>
+          <Select
+            value={calidadMostrada}
+            onValueChange={(v) => typeof v === 'string' && setCalidadSel(v)}
+            items={Object.fromEntries(CALIDADES.map((c) => [c, calidadLabel(c)]))}
+          >
+            <SelectTrigger className="h-9 w-44">
+              <SelectValue placeholder="Calidad…" />
+            </SelectTrigger>
+            <SelectContent>
+              {CALIDADES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {calidadLabel(c)}
+                  {c === config?.calidadImagenDefault ? ' · sugerida' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {archivos.length ? (
+          <div className="flex flex-wrap gap-2">
+            {archivos.map((f, i) => (
+              <div key={`${f.name}-${i}`} className="group relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={URL.createObjectURL(f)} alt={f.name} className="size-20 rounded-lg border border-border object-cover" />
+                <button
+                  type="button"
+                  aria-label="Quitar foto"
+                  onClick={() => quitarArchivo(i)}
+                  className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-destructive text-white opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium hover:bg-secondary">
+          <Plus className="size-4" />
+          Agregar foto
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              agregarArchivos(e.target.files)
+              e.target.value = ''
+            }}
+          />
+        </label>
+      </div>
+
+      <div className="mt-4 flex justify-end">
         <Button disabled={!puedeAgregar || crear.isPending} onClick={() => crear.mutate()}>
           {crear.isPending ? <Loader2 className="animate-spin" /> : <Plus strokeWidth={2.5} />}
           Agregar
@@ -458,9 +550,9 @@ function SubirFoto({ hallazgoId, onUploaded }: { hallazgoId: number; onUploaded:
     queryFn: () => api.get('nucleo/configuracion/calidad-imagen').json<{ calidadImagenDefault: string }>(),
     staleTime: 60_000,
   })
-  const defaultCalidad = config?.calidadImagenDefault ?? 'OPTIMIZADA'
   const [calidadSel, setCalidadSel] = useState<string | null>(null)
-  const calidad = calidadSel ?? defaultCalidad
+  // Solo se muestra el sugerido; no se envía salvo elección explícita (QA-OKA-010).
+  const calidadMostrada = calidadSel ?? config?.calidadImagenDefault
   const [subiendo, setSubiendo] = useState(false)
 
   async function onFile(file: File | undefined) {
@@ -468,7 +560,7 @@ function SubirFoto({ hallazgoId, onUploaded }: { hallazgoId: number; onUploaded:
     setSubiendo(true)
     try {
       const fd = new FormData()
-      fd.append('calidad', calidad)
+      if (calidadSel) fd.append('calidad', calidadSel)
       fd.append('imagen', file)
       await api.post(`tecnica/hallazgos/${hallazgoId}/fotos`, { body: fd })
       toast.success('Foto agregada.')
@@ -483,18 +575,18 @@ function SubirFoto({ hallazgoId, onUploaded }: { hallazgoId: number; onUploaded:
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
       <Select
-        value={calidad}
+        value={calidadMostrada}
         onValueChange={(v) => typeof v === 'string' && setCalidadSel(v)}
         items={Object.fromEntries(CALIDADES.map((c) => [c, calidadLabel(c)]))}
       >
         <SelectTrigger className="h-9 w-44">
-          <SelectValue />
+          <SelectValue placeholder="Calidad…" />
         </SelectTrigger>
         <SelectContent>
           {CALIDADES.map((c) => (
             <SelectItem key={c} value={c}>
               {calidadLabel(c)}
-              {c === defaultCalidad ? ' · sugerida' : ''}
+              {c === config?.calidadImagenDefault ? ' · sugerida' : ''}
             </SelectItem>
           ))}
         </SelectContent>

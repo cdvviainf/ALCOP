@@ -5,6 +5,8 @@
 > **Implementación por olas (13-10-2026):**
 > - **Ola A — Backend (en curso):** modelos + migración (+ backfill de unidades para ObraLote existentes), autogeneración de `LoteUnidad` en el CRUD de ObraLote (atómico), optimización de imagen (`sharp`), `Configuracion` (calidad por defecto) y el módulo `tecnica/visitas` (CRUD visita + hallazgos + subir/descargar/quitar fotos). Autorización por `TEC_INSPECCION`.
 > - **Ola B — Reporte + Frontend (implementada, 13-10-2026):** **reporte HTML→PDF** `GET /visitas/:id/reporte.pdf` (Playwright, imágenes embebidas como data URI; `shared/pdf.ts` + `visitas.reporte.ts`). Frontend: lista de visitas + "Nueva visita", página de captura `/registro/inspeccion-tecnica/[id]` (agregar hallazgos con unidad+tipo+comentario, subir/quitar fotos con calidad, finalizar con resumen, exportar PDF), y `/configuracion/calidad-imagen` (admin). El menú "Visita Técnica" ya apunta al módulo. La pantalla del reporte se resolvió como **exportar PDF** desde el detalle (el detalle ya muestra todos los hallazgos agrupados); no se hizo una vista HTML de reporte aparte en pantalla.
+>
+> **Decisión confirmada (Christian, 22-10-2026) — "fotos parte del alta del hallazgo" (item 2):** las fotos dejan de subirse en un paso separado y pasan a adjuntarse en el **mismo alta** del hallazgo (`POST /visitas/:id/hallazgos` ahora es **multipart**). Un `HALLAZGO` exige **≥1 foto en el alta** (antes se validaba solo al finalizar); `NOTA_TECNICA` sigue con foto opcional. Esto **supersede** la redacción previa ("foto en paso aparte / validada al finalizar"). Detalles de calidad y tope en §4 (decisión 2) y §6. Los endpoints por-foto (`POST /hallazgos/:id/fotos`, `DELETE /fotos/:id`) se conservan para agregar/quitar fotos adicionales en el detalle mientras la visita esté EN_CURSO.
 
 ## 1. Propósito
 
@@ -77,7 +79,7 @@ model VisitaTecnica {
 }
 
 // Tipo de registro de una entrada de visita (22-10-2026):
-//   HALLAZGO     → exige tipo de hallazgo + comentario + ≥1 foto (foto validada al finalizar).
+//   HALLAZGO     → exige tipo de hallazgo + comentario + ≥1 foto adjunta en el alta (item 2).
 //   NOTA_TECNICA → exige comentario; foto opcional; sin tipo de hallazgo.
 enum TipoRegistroHallazgo {
   HALLAZGO
@@ -136,7 +138,7 @@ model Configuracion {
 ### Decisiones cerradas (13-10-2026)
 
 1. **Lote = unidad individual autogenerada**: al configurar `ObraLote` (cantidad N de un tipo), el sistema genera N `LoteUnidad` con `descripcion = "<TipoLote.nombre> <correlativo>"` (correlativo con padding a 3, p. ej. `Casa 001`). El hallazgo referencia una `LoteUnidad`.
-2. **Fotos en BD + optimización**: se guardan en BD (bytea) con `jimp` (JS puro; sharp no corre en el CPU del servidor), una rendición por foto a la **calidad elegida al subir**. Presets: Original (tope ~4000px, sin recomprimir), Optimizada (~2000px/q82, **default sugerido**), Media (~1280px/q70), Baja (~800px/q55). El default sale de `Configuracion.calidad_imagen_default` y viene preseleccionado; el usuario puede cambiarlo por foto.
+2. **Fotos en BD + optimización**: se guardan en BD (bytea) con `jimp` (JS puro; sharp no corre en el CPU del servidor), una rendición por foto a la **calidad elegida**. Presets: Original (tope ~4000px, sin recomprimir), Optimizada (~2000px/q82, **default sugerido**), Media (~1280px/q70), Baja (~800px/q55). El default sale de `Configuracion.calidad_imagen_default` y viene preseleccionado. **Granularidad de la calidad (confirmado 22-10-2026, item 2):** en el **alta** del hallazgo la calidad elegida se aplica al **lote** de fotos de ese alta (un solo selector); si se necesita una calidad distinta por imagen, se agrega la foto individualmente desde el detalle (`POST /hallazgos/:id/fotos`, que sí recibe su propia calidad). Supersede la redacción previa de "calidad por foto" para el caso del alta múltiple.
 3. **Reporte HTML → PDF**: pantalla de reporte (secciones fijas) + exportar a PDF (Playwright renderiza el HTML). Imágenes embebidas como data URI en el PDF (self-contained).
 4. **Alcance**: solo visita → hallazgos → reporte. Sin ciclo de corrección, sin nidos/puntales, sin IA (hook/campo listos para después).
 
@@ -147,7 +149,7 @@ model Configuracion {
    - cantidad baja de A→B: se eliminan (soft) las unidades `>B` **que no tengan hallazgos**; si alguna con `>B` tiene hallazgos, se **rechaza** la reducción (409).
    - quitar el lote: elimina sus unidades si ninguna tiene hallazgos; si no, se rechaza.
 2. **Crear visita** (`TEC_INSPECCION` TOTAL): obra + fecha + hora inicio/término → nace `EN_CURSO`. El inspector es el usuario de la sesión.
-3. **Agregar registro**: unidad de lote (de la obra de la visita) + **tipo de registro**. Si es **Hallazgo**: tipo de hallazgo + comentario (obligatorios) y ≥1 foto (la foto se sube en paso aparte y su obligatoriedad se valida al finalizar). Si es **Nota técnica**: comentario obligatorio, foto opcional, sin tipo de hallazgo. Las fotos se suben 1..N (cada una con su calidad; el backend la optimiza y guarda en BD).
+3. **Agregar registro**: unidad de lote (de la obra de la visita) + **tipo de registro**. Si es **Hallazgo**: tipo de hallazgo + comentario (obligatorios) y **≥1 foto, adjunta en el mismo alta** (item 2, 22-10-2026 — el `POST` de hallazgo es multipart: campos + archivos `imagen`). Si es **Nota técnica**: comentario obligatorio, foto opcional, sin tipo de hallazgo. Las fotos van 1..N con una **calidad común al alta** (ver §4, decisión 2); el backend las optimiza y guarda en BD en la misma transacción. Tope de **10 fotos por alta** (configurable; §6). Agregar/quitar fotos adicionales —y con calidad distinta— sigue disponible por foto en el detalle mientras la visita esté EN_CURSO.
 4. **Finalizar visita**: el inspector escribe el `resumenFinal` y marca `FINALIZADA` → queda solo lectura.
 5. **Reporte**: `GET /visitas/:id/reporte` (datos para pantalla) y `GET /visitas/:id/reporte.pdf` (HTML→PDF). Secciones fijas:
    - **Encabezado**: inspector (usuario), obra, fecha, hora inicio/término.
@@ -162,7 +164,7 @@ model Configuracion {
 - **Autorización**: visitas/hallazgos/fotos → `requirePermiso('TEC_INSPECCION', 'LECTURA'|'TOTAL')`; `esAdmin` todo. Config de imagen: **cambiar** la calidad por defecto → `requireAdmin`; **consultarla** → cualquier usuario autenticado (para preselección al subir fotos — QA-OLA-B-001). Los selectores que alimenta el módulo (obras, tipos de hallazgo) son legibles por `TEC_INSPECCION` aunque sean de otra función (QA-OLA-B-005): el listado de obras lo lee cualquier autenticado (nucleo-compartido.md §95) y el de tipos de hallazgo se abre a `TEC_CAT_TIPOS_HALLAZGO | TEC_INSPECCION`.
 - **Generación de unidades**: `descripcion` con padding a 3 (o al ancho de la cantidad si supera 999). Autogenerada; no editable a mano en esta ola.
 - **Edición**: solo visitas `EN_CURSO` se editan (agregar/quitar hallazgos, subir/borrar fotos). `FINALIZADA` = solo lectura (el reporte sigue disponible).
-- **Fotos**: solo imágenes (`image/*`); se optimizan con `jimp` según la calidad elegida; se guarda el binario en BD + metadata. Límite de tamaño de entrada configurable (default 25 MB antes de optimizar).
+- **Fotos**: solo imágenes (`image/*`); se optimizan con `jimp` según la calidad elegida; se guarda el binario en BD + metadata. Límite de tamaño de entrada configurable (default 25 MB antes de optimizar). **Tope de 10 fotos por alta de hallazgo** (`MAX_FOTOS_ALTA`, item 2, 22-10-2026): la UI no deja acumular más y el backend devuelve un error tipado 413 si se excede. No limita el total por hallazgo —se pueden seguir agregando de a una desde el detalle.
 - **Borrado**: soft-delete de visita/hallazgo con timestamp (`eliminadoEn`/`eliminadoPor`); nunca `DELETE` físico de la visita. La **eliminación de una visita se permite en cualquier estado** (también `FINALIZADA`), porque es reversible (soft delete) — decisión de Christian 13-10-2026, supersede QA-OLA-A-004; `FINALIZADA` sigue siendo solo lectura para su *contenido* (no se editan hallazgos/fotos), pero sí se puede eliminar. El borrado de fotos de un hallazgo es físico (hijos sin auditoría).
 - **Listado**: filtros por obra (`obraId`) y por inspector (`usuarioId`), y orden por `fecha` | `obra` | `inspector` (asc/desc). El filtro de inspectores se alimenta de `GET /visitas/inspectores` (usuarios distintos con visitas).
 - **No bloquear por procedimientos**: este módulo no consulta Procedimientos/Formularios.
@@ -170,7 +172,7 @@ model Configuracion {
 ## 7. Validaciones
 
 - Visita: `obraId` existente; `fecha` obligatoria; `horaTermino >= horaInicio` si ambas vienen; estado ∈ enum.
-- Registro: `loteUnidadId` pertenece a la **obra de la visita**; `comentario` **obligatorio** en ambos tipos. Si `tipoRegistro = HALLAZGO`: `tipoHallazgoId` **obligatorio** y activo, y **≥1 foto** (la foto se valida al **finalizar**, porque se sube en paso aparte). Si `tipoRegistro = NOTA_TECNICA`: sin `tipoHallazgoId`, foto opcional.
+- Registro: `loteUnidadId` pertenece a la **obra de la visita**; `comentario` **obligatorio** en ambos tipos. Si `tipoRegistro = HALLAZGO`: `tipoHallazgoId` **obligatorio** y activo, y **≥1 foto exigida en el alta** (multipart; item 2). Si `tipoRegistro = NOTA_TECNICA`: sin `tipoHallazgoId`, foto opcional. El gate de **finalizar** mantiene el chequeo de "todo HALLAZGO con ≥1 foto" como red de seguridad (p. ej. si se quitaron todas las fotos en edición).
 - Foto: `mimetype` image/*; `calidad` ∈ enum; tamaño de entrada ≤ límite.
 - Finalizar: la visita debe tener **al menos un registro** (hallazgo **o** nota técnica) — **decisión 22-10-2026:** se permiten visitas compuestas solo por notas técnicas (una visita puede arrojar solo observaciones; resuelve el "confirmar" previo). Además, al finalizar: todo registro debe tener comentario y todo `HALLAZGO` debe tener ≥1 foto. `resumenFinal` recomendado (¿obligatorio al finalizar? — ver pendientes).
 - **Transición / grandfathering (22-10-2026):** los registros creados antes de esta regla quedan marcados `HALLAZGO` por la migración (default), **sin auto-reclasificación** a nota (no se puede inferir con certeza — CLAUDE.md §0). Las nuevas obligaciones (comentario + foto en HALLAZGO) aplican a registros creados/editados desde ahora y se **exigen al finalizar** una visita `EN_CURSO` (comportamiento deseado de calidad de datos: el inspector completa el dato o reclasifica a Nota técnica vía el diálogo de edición). Las visitas `FINALIZADA` históricas se respetan tal cual (solo lectura); el reporte muestra la verdad del dato ("Sin comentario" si aplica) y el badge "Falta foto" **no** se muestra en visitas no editables.
@@ -190,7 +192,7 @@ model Configuracion {
 
 ## 10. Pendientes
 
-- [x] ¿Un hallazgo exige al menos una foto? **Resuelto (22-10-2026):** depende del **tipo de registro** — HALLAZGO exige comentario + ≥1 foto (foto validada al finalizar); NOTA_TECNICA exige solo comentario. Reemplaza la regla previa "al menos uno de los dos".
+- [x] ¿Un hallazgo exige al menos una foto? **Resuelto (22-10-2026):** depende del **tipo de registro** — HALLAZGO exige comentario + **≥1 foto adjunta en el alta** (item 2; el gate de finalizar lo revalida como red de seguridad); NOTA_TECNICA exige solo comentario. Reemplaza la regla previa "al menos uno de los dos".
 - [ ] ¿`resumenFinal` obligatorio para finalizar? (hoy: recomendado).
 - [ ] ¿Reapertura de visitas `FINALIZADA`?
 - [ ] Búsqueda/paginación en el selector de unidad de lote (una obra puede tener cientos de unidades).

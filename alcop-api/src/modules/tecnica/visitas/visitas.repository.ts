@@ -138,8 +138,16 @@ export const visitasRepository = {
     return prisma.obra.findFirst({ where: { id: obraId, eliminadoEn: null }, select: { id: true } })
   },
 
-  async crear(data: CrearVisitaInput, usuarioId: string) {
-    return prisma.visitaTecnica.create({
+  /** Bloquea la obra viva (FOR UPDATE) — serializa crear-visita vs borrar-obra (QA-OKA-018). */
+  async lockObraViva(tx: Prisma.TransactionClient, obraId: number): Promise<boolean> {
+    const rows = await tx.$queryRaw<
+      Array<{ id: number }>
+    >`SELECT id FROM "Obra" WHERE id = ${obraId} AND "eliminadoEn" IS NULL FOR UPDATE`
+    return rows.length > 0
+  },
+
+  async crear(data: CrearVisitaInput, usuarioId: string, db: DbClient = prisma) {
+    return db.visitaTecnica.create({
       data: {
         obraId: data.obraId,
         usuarioId,
@@ -225,6 +233,11 @@ export const visitasRepository = {
       where: { id: hallazgoId, eliminadoEn: null },
       select: { id: true, visitaId: true, tipoRegistro: true, tipoHallazgoId: true },
     })
+  },
+
+  /** Hallazgo completo (con fotos) para construir el DTO tras crearlo con fotos. */
+  async buscarHallazgoDetalle(hallazgoId: number, db: DbClient = prisma) {
+    return db.hallazgoTecnico.findFirst({ where: { id: hallazgoId }, include: hallazgoInclude })
   },
 
   async actualizarHallazgo(

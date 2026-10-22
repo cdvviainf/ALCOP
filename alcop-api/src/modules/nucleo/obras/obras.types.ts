@@ -14,10 +14,17 @@ export interface ObraDTO {
   creadoEn: string
 }
 
-/** Titular (asignación) de una obra. */
+/** Titular (rol de notificación) de una obra. */
 export interface TitularDTO {
   id: number
   rolObra: RolObra
+  usuario: { id: string; nombre: string; email: string }
+  creadoEn: string
+}
+
+/** Acceso de un usuario a una obra (pertenencia, sin rol). */
+export interface AccesoObraDTO {
+  id: number
   usuario: { id: string; nombre: string; email: string }
   creadoEn: string
 }

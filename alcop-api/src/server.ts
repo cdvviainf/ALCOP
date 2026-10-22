@@ -97,12 +97,16 @@ await app.register(import('./modules/nucleo/perfiles/perfiles.routes.js'), { pre
 await app.register(import('./modules/nucleo/categorias-formulario/categorias-formulario.routes.js'), {
   prefix: '/api/nucleo',
 })
+await app.register(import('./modules/nucleo/subcategorias-formulario/subcategorias-formulario.routes.js'), {
+  prefix: '/api/nucleo',
+})
 await app.register(import('./modules/nucleo/formularios/formularios.routes.js'), { prefix: '/api/nucleo' })
 await app.register(import('./modules/nucleo/tipos-lote/tipos-lote.routes.js'), { prefix: '/api/nucleo' })
 await app.register(import('./modules/nucleo/procedimientos/procedimientos.routes.js'), {
   prefix: '/api/nucleo',
 })
 await app.register(import('./modules/nucleo/configuracion/configuracion.routes.js'), { prefix: '/api/nucleo' })
+await app.register(import('./modules/prevencion/visitas/visitas.routes.js'), { prefix: '/api/prevencion' })
 await app.register(import('./modules/prevencion/niveles-riesgo/niveles-riesgo.routes.js'), {
   prefix: '/api/prevencion',
 })

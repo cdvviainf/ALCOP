@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowUp,
   Blocks,
@@ -132,7 +132,8 @@ const NAV: Seccion[] = [
             title: 'Prevención',
             icon: ShieldAlert,
             children: [
-              { title: 'Categorías', href: '/formularios/categorias/prevencion', icon: FolderTree, requiere: ['PREV_CAT_CATEGORIAS'] },
+              { title: 'Categorías', href: '/prevencion/categorias', icon: FolderTree, requiere: ['PREV_CAT_CATEGORIAS'] },
+              { title: 'Subcategorías', href: '/prevencion/subcategorias', icon: FolderTree, requiere: ['PREV_CAT_CATEGORIAS'] },
               { title: 'Nivel de Riesgo', href: '/prevencion/niveles-riesgo', icon: Gauge, requiere: ['PREV_CAT_NIVEL_RIESGO'] },
             ],
           },
@@ -185,6 +186,7 @@ function hrefsVisibles(items: Nodo[], me: Me | undefined): string[] {
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { data: me } = useQuery({
     queryKey: ['me'],
     queryFn: () => api.get('usuarios/me').json<Me>(),
@@ -198,6 +200,9 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     await authClient.signOut()
+    // Vacía la caché de react-query (incl. ['me']): sin esto el próximo usuario
+    // hereda el menú/permisos del anterior hasta recargar (bug de menú stale).
+    queryClient.clear()
     router.push('/login')
     router.refresh()
   }

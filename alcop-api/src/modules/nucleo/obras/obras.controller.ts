@@ -1,8 +1,10 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { UnauthorizedError } from '../../../shared/errors.js'
 import {
+  accesoParamSchema,
   actualizarLoteSchema,
   actualizarObraSchema,
+  agregarAccesoSchema,
   agregarLoteSchema,
   asignarTitularSchema,
   crearObraSchema,
@@ -42,6 +44,26 @@ export const obrasController = {
     if (!request.usuarioId) throw new UnauthorizedError()
     const { id } = obraIdParamSchema.parse(request.params)
     await obrasService.eliminar(id, request.usuarioId)
+    return reply.status(204).send()
+  },
+
+  // ─── Acceso usuario↔obra ──────────────────────────────────────────────────
+  async listarAccesos(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = obraIdParamSchema.parse(request.params)
+    return reply.send({ data: await obrasService.listarAccesos(id) })
+  },
+
+  async agregarAcceso(request: FastifyRequest, reply: FastifyReply) {
+    if (!request.usuarioId) throw new UnauthorizedError()
+    const { id } = obraIdParamSchema.parse(request.params)
+    const { usuarioId } = agregarAccesoSchema.parse(request.body)
+    return reply.status(201).send(await obrasService.agregarAcceso(id, usuarioId, request.usuarioId))
+  },
+
+  async quitarAcceso(request: FastifyRequest, reply: FastifyReply) {
+    if (!request.usuarioId) throw new UnauthorizedError()
+    const { id, accesoId } = accesoParamSchema.parse(request.params)
+    await obrasService.quitarAcceso(id, accesoId, request.usuarioId)
     return reply.status(204).send()
   },
 

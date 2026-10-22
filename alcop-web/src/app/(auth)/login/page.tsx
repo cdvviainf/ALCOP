@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -31,6 +32,7 @@ function BrandMark({ className }: { className?: string }) {
 
 export default function LoginPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [authError, setAuthError] = useState<string | null>(null)
   const {
     register,
@@ -52,6 +54,9 @@ export default function LoginPage() {
       setAuthError('Credenciales inválidas. Verifica tu usuario y contraseña.')
       return
     }
+    // Limpia cualquier caché previa (p. ej. ['me'] de una sesión anterior sin
+    // logout limpio) para que el menú/permisos se construyan desde cero.
+    queryClient.clear()
     const from =
       typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('from')

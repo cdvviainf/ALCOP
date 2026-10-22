@@ -125,9 +125,11 @@ model Usuario {
   perfilId    Int?
   perfil      Perfil?  @relation(fields: [perfilId], references: [id])
   obras       UsuarioObra[]
+  titularidades ObraTitular[]
   respuestas  RespuestaFormulario[]
   permisos    FormularioPermiso[]
   visitas     VisitaTecnica[]
+  visitasPrevencion VisitaPrevencion[]
   creadoEn    DateTime @default(now())
   creadoPor   String?
   eliminadoEn DateTime?
@@ -177,21 +179,39 @@ model PerfilPermiso {
 // Asignación de titulares de obra (nucleo-compartido.md §4). Varios usuarios por
 // rol; un usuario puede tener más de un rol. El @@unique evita duplicar la misma
 // persona en el mismo rol de la misma obra.
+// Acceso de un usuario a una obra (22-10-2026). Es la pertenencia pura usuario↔obra,
+// SIN rol: los roles viven en ObraTitular y se eligen solo entre quienes tienen acceso.
+// Unicidad (obraId, usuarioId) entre las vivas → índice único PARCIAL en la migración.
 model UsuarioObra {
-  id           Int       @id @default(autoincrement())
-  usuarioId    String
-  usuario      Usuario   @relation(fields: [usuarioId], references: [id])
-  obraId       Int
-  obra         Obra      @relation(fields: [obraId], references: [id])
-  rolObra        RolObra
+  id             Int       @id @default(autoincrement())
+  usuarioId      String
+  usuario        Usuario   @relation(fields: [usuarioId], references: [id])
+  obraId         Int
+  obra           Obra      @relation(fields: [obraId], references: [id])
   creadoEn       DateTime  @default(now())
   creadoPor      String?
   actualizadoEn  DateTime? @updatedAt
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
+}
 
-  @@unique([obraId, rolObra, usuarioId])
+// Titular de un rol de notificación en una obra (22-10-2026). Un titular por rol
+// por obra (índice único parcial (obraId, rolObra)); el usuario debe tener acceso
+// (UsuarioObra) a esa obra. Reemplaza el rol que antes vivía en UsuarioObra.
+model ObraTitular {
+  id             Int       @id @default(autoincrement())
+  obraId         Int
+  obra           Obra      @relation(fields: [obraId], references: [id])
+  rolObra        RolObra
+  usuarioId      String
+  usuario        Usuario   @relation(fields: [usuarioId], references: [id])
+  creadoEn       DateTime  @default(now())
+  creadoPor      String?
+  actualizadoEn  DateTime? @updatedAt
+  actualizadoPor String?
+  eliminadoEn    DateTime?
+  eliminadoPor   String?
 }
 
 // Obra — raíz del sistema. Modelo definitivo según Docs/nucleo-compartido.md §4.
@@ -206,9 +226,11 @@ model Obra {
   fechaTerminoEstimada DateTime?
   estado               EstadoObra @default(SIN_INICIAR)
   usuarios             UsuarioObra[]
+  titulares            ObraTitular[]
   lotes                ObraLote[]
   loteUnidades         LoteUnidad[]
   visitas              VisitaTecnica[]
+  visitasPrevencion    VisitaPrevencion[]
   respuestas           RespuestaFormulario[]
   // Auditoría completa (nucleo-compartido.md §6 — convención canónica).
   creadoEn             DateTime   @default(now())
@@ -232,6 +254,7 @@ model NivelRiesgo {
   nombre       String
   orden        Int       @default(0)
   activo       Boolean   @default(true)
+  hallazgos    HallazgoPrevencion[]
   creadoEn     DateTime  @default(now())
   creadoPor    String?
   eliminadoEn  DateTime?
@@ -289,12 +312,33 @@ model CategoriaFormulario {
   nombre       String
   // Campos de mantenedor (ampliación del spec formularios-dinamicos.md §4,
   // 06-10-2026): estado + soft delete + auditoría, aditivos con default.
-  activo       Boolean      @default(true)
-  formularios  Formulario[]
-  creadoEn     DateTime     @default(now())
-  creadoPor    String?
-  eliminadoEn  DateTime?
-  eliminadoPor String?
+  activo        Boolean      @default(true)
+  formularios   Formulario[]
+  subcategorias SubcategoriaFormulario[]
+  hallazgosPrevencion HallazgoPrevencion[]
+  creadoEn      DateTime     @default(now())
+  creadoPor     String?
+  eliminadoEn   DateTime?
+  eliminadoPor  String?
+}
+
+// Nivel anidado bajo CategoriaFormulario (22-10-2026). En Prevención clasifica
+// los hallazgos de visita (categoría › subcategoría). Mismos campos que la
+// categoría; hereda el Área vía la categoría padre.
+model SubcategoriaFormulario {
+  id             Int                 @id @default(autoincrement())
+  categoriaId    Int
+  categoria      CategoriaFormulario @relation(fields: [categoriaId], references: [id])
+  codigo         String // slug del nombre, único por categoría (índice parcial WHERE eliminadoEn IS NULL)
+  nombre         String
+  activo         Boolean             @default(true)
+  hallazgos      HallazgoPrevencion[]
+  creadoEn       DateTime            @default(now())
+  creadoPor      String?
+  actualizadoEn  DateTime?           @updatedAt
+  actualizadoPor String?
+  eliminadoEn    DateTime?
+  eliminadoPor   String?
 }
 
 model Formulario {
@@ -559,6 +603,83 @@ model HallazgoFotoData {
   id     Int          @id @default(autoincrement())
   fotoId Int          @unique
   foto   HallazgoFoto @relation(fields: [fotoId], references: [id])
+  datos  Bytes
+}
+
+// ─── Visitas de Prevención (Docs/prevencion.md, Ola 2) ──────────────────────
+// Calcado de Visitas Técnicas (reusa EstadoVisita/CalidadImagen), con diferencias:
+// SIN lote; clasificación Categoría › Subcategoría + NivelRiesgo; plazo de solución
+// (valor + días/horas); histórico sin ciclo "por resolver".
+
+enum PlazoUnidad {
+  DIAS
+  HORAS
+}
+
+model VisitaPrevencion {
+  id             Int          @id @default(autoincrement())
+  obraId         Int
+  obra           Obra         @relation(fields: [obraId], references: [id])
+  usuarioId      String
+  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
+  fecha          DateTime
+  horaInicio     String?
+  horaTermino    String?
+  estado         EstadoVisita @default(EN_CURSO)
+  resumenFinal   String?
+  hallazgos      HallazgoPrevencion[]
+  creadoEn       DateTime     @default(now())
+  creadoPor      String?
+  actualizadoEn  DateTime?    @updatedAt
+  actualizadoPor String?
+  eliminadoEn    DateTime?
+  eliminadoPor   String?
+}
+
+model HallazgoPrevencion {
+  id             Int                    @id @default(autoincrement())
+  visitaId       Int
+  visita         VisitaPrevencion       @relation(fields: [visitaId], references: [id])
+  categoriaId    Int
+  categoria      CategoriaFormulario    @relation(fields: [categoriaId], references: [id])
+  subcategoriaId Int
+  subcategoria   SubcategoriaFormulario @relation(fields: [subcategoriaId], references: [id])
+  nivelRiesgoId  Int
+  nivelRiesgo    NivelRiesgo            @relation(fields: [nivelRiesgoId], references: [id])
+  plazoValor     Int                    // tiempo estimado de solución (> 0)
+  plazoUnidad    PlazoUnidad
+  comentario     String                 // obligatorio
+  orden          Int                    @default(0)
+  fotos          HallazgoPrevencionFoto[]
+  // Auditoría completa (nucleo-compartido.md §6 — tabla nueva, QA-OKA-019).
+  creadoEn       DateTime               @default(now())
+  creadoPor      String?
+  actualizadoEn  DateTime?              @updatedAt
+  actualizadoPor String?
+  eliminadoEn    DateTime?
+  eliminadoPor   String?
+}
+
+// Metadata de la foto (sin el binario → no se arrastra en listados).
+model HallazgoPrevencionFoto {
+  id         Int                 @id @default(autoincrement())
+  hallazgoId Int
+  hallazgo   HallazgoPrevencion  @relation(fields: [hallazgoId], references: [id])
+  mimetype   String
+  calidad    CalidadImagen
+  tamano     Int
+  ancho      Int?
+  alto       Int?
+  orden      Int                 @default(0)
+  data       HallazgoPrevencionFotoData?
+  creadoEn   DateTime            @default(now())
+}
+
+// Binario de la foto EN LA BD (bytea), tabla separada (patrón de técnica).
+model HallazgoPrevencionFotoData {
+  id     Int                    @id @default(autoincrement())
+  fotoId Int                    @unique
+  foto   HallazgoPrevencionFoto @relation(fields: [fotoId], references: [id])
   datos  Bytes
 }
 

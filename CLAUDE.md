@@ -218,7 +218,7 @@ alcop-web/
 | `formularios-dinamicos.md` | **Cerrado** | CategoriaFormulario, Formulario, Pregunta, RespuestaFormulario, RespuestaPregunta, FormularioPermiso |
 | `nucleo-compartido.md` | Pendiente de spec | Obra, PanelResumen |
 | `lotes-procedimientos.md` | **Cerrado (v0.1, 12-10-2026)** | TipoLote, Procedimiento (PDF), TipoLoteProcedimiento, ProcedimientoFormulario, ObraLote; cadena Obra→Lotes→Procedimientos→Formularios + derivación de formularios aplicables |
-| `prevencion.md` | Pendiente de spec | Hallazgo, VisitaPrevencion, AnalisisIA |
+| `prevencion.md` | **v0.1 (22-10-2026)** — Ola 1 (clasificación Categoría › Subcategoría) + Ola 2 (Visitas de Prevención) cerradas; AnalisisIA pendiente | SubcategoriaFormulario, VisitaPrevencion, HallazgoPrevencion; (pend.) AnalisisIA |
 | `tecnica.md` | Pendiente de spec | VisitaTecnica, HitoEtapa (nidos/puntales), AnalisisIA |
 | `reportes.md` | Pendiente de spec | Reporte (PDF generado), vínculo a Formulario/Visita/Hallazgo/AnalisisIA |
 | `alertas.md` | Pendiente de spec | Notificación por obra (Administrador, Jefe de Terreno, Prevencionista) |
@@ -334,6 +334,7 @@ Ver `docker-compose.yml` en la raíz del proyecto (PostgreSQL 17, Redis 7, pgAdm
 - Definición técnica de la Etapa 2 (App móvil) puesta en stand by el 04-10-2026 — foco 100% en Etapa 1 por ahora.
 - Reglas de acceso y permisos cerradas el 04-10-2026: "Jefe Prevencionista" queda `SIN_ACCESO` en Técnica (difiere de la redacción "ambas" de alcop-esquema.html §08); `FormularioPermiso` solo amplía acceso, nunca lo niega; `CategoriaFormulario` es 100% dinámico, sin lista cerrada previa.
 - **Scaffold montado el 04-10-2026** (`alcop-api` + `alcop-web`). Decisión de stack frontend: se adopta **Next.js 16 + shadcn sobre Base UI** (lo que entrega `create-next-app@latest`/`shadcn@latest` hoy) en vez de forzar el downgrade a Next 15 / Radix del contrato original — diverge del template Kiranism/FAS a conciencia. `ky` fijado a v1.x. Backend fijado al contrato: **Prisma 5.x, Zod 3.x, TypeScript 5.x** (se bajaron desde las latest 7/4/7 que traía `npm install`). `dotenv` agregado al backend solo para cargar `.env` en desarrollo local (en Docker/prod la env la inyecta el entorno).
+- **Diferimiento de "responsable" en Hallazgo de Prevención (22-10-2026, decisión de Christian/VIAIN):** `alcop-esquema.html §06` compromete los hallazgos de prevención "con foto y **responsable**". Christian decidió **sacar el `responsable`** de la Etapa 1 (ni front ni API) y **reprogramarlo a una ola posterior**. **El compromiso comercial sigue vigente** — no desaparece; solo cambia de etapa por decisión explícita del dueño del alcance (VIAIN). Queda trazado en `Docs/prevencion.md §10`. En QA del ciclo `oka` corresponde al hallazgo **QA-OKA-013**, **no bloqueante por ser requisito diferido** (arbitraje ronda 15); al retomarlo se define obligatoriedad y semántica (texto libre vs. relación a usuario). *(Nota: el diferimiento se sostiene en esta decisión de negocio explícita, no en la autoridad de §11, que cubre modelos/rutas/permisos, no la reducción del alcance comercial.)*
 
 ---
 

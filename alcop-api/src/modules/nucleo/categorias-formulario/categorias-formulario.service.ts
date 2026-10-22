@@ -1,4 +1,5 @@
 import type { NivelAcceso } from '@prisma/client'
+import { prisma } from '../../../lib/prisma.js'
 import { ConflictError, ForbiddenError, NotFoundError } from '../../../shared/errors.js'
 import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
@@ -20,6 +21,12 @@ const CAT_FUNCION: Record<string, string> = {
 const FORM_FUNCION: Record<string, string> = {
   PREVENCION: 'PREV_FORMULARIOS',
   TECNICA: 'TEC_FORMULARIOS',
+}
+// Y quien inspecciona el área: el alta de hallazgos arranca eligiendo Categoría →
+// Subcategoría, así que un inspector debe poder leer el picker (QA-OKA-005).
+const INSPECCION_FUNCION: Record<string, string> = {
+  PREVENCION: 'PREV_INSPECCION',
+  TECNICA: 'TEC_INSPECCION',
 }
 
 type FilaConArea = {
@@ -89,13 +96,19 @@ export const categoriasService = {
   ): Promise<Array<{ id: number; codigo: string; nombre: string }>> {
     const area = await categoriasRepository.buscarArea(areaId)
     if (!area) throw new NotFoundError('Área', String(areaId))
-    // Puede ver las categorías del área quien administra sus Categorías O sus
-    // Formularios (el builder las necesita). esAdmin pasa siempre.
+    // Puede ver las categorías del área quien administra sus Categorías, sus
+    // Formularios (el builder) o quien inspecciona el área (el alta de hallazgos).
+    // esAdmin pasa siempre.
     const nivelForm = acceso.esAdmin
       ? 'TOTAL'
       : (acceso.permisos?.[FORM_FUNCION[area.codigo]] ?? 'SIN_ACCESO')
+    const nivelInsp = acceso.esAdmin
+      ? 'TOTAL'
+      : (acceso.permisos?.[INSPECCION_FUNCION[area.codigo]] ?? 'SIN_ACCESO')
     const puede =
-      nivelCategoriasDeArea(acceso, area.codigo) !== 'SIN_ACCESO' || nivelForm !== 'SIN_ACCESO'
+      nivelCategoriasDeArea(acceso, area.codigo) !== 'SIN_ACCESO' ||
+      nivelForm !== 'SIN_ACCESO' ||
+      nivelInsp !== 'SIN_ACCESO'
     if (!puede) throw new ForbiddenError('Sin acceso a las categorías de esta área.')
     return categoriasRepository.listarOpciones(areaId)
   },
@@ -158,12 +171,27 @@ export const categoriasService = {
     if (!existente) throw new NotFoundError('Categoría de formulario', String(id))
     exigirTotalEnArea(acceso, existente.area.codigo)
 
-    const formularios = await categoriasRepository.contarFormularios(id)
-    if (formularios > 0) {
-      throw new ConflictError(
-        `No se puede eliminar: la categoría tiene ${formularios} formulario(s). Muévelos o elimínalos primero.`
-      )
-    }
-    await categoriasRepository.softDelete(id, usuarioId)
+    // Conteo + baja dentro de una transacción con lock de la fila (QA-OKA-006):
+    // serializa frente al alta de subcategorías, que bloquea esa misma fila.
+    await prisma.$transaction(async (tx) => {
+      const viva = await categoriasRepository.lockCategoria(tx, id)
+      if (!viva) throw new NotFoundError('Categoría de formulario', String(id))
+
+      const formularios = await categoriasRepository.contarFormularios(id, tx)
+      if (formularios > 0) {
+        throw new ConflictError(
+          `No se puede eliminar: la categoría tiene ${formularios} formulario(s). Muévelos o elimínalos primero.`
+        )
+      }
+      // Simétrico al bloqueo por formularios (QA-OKA-004): no dejar subcategorías
+      // huérfanas bajo un padre eliminado.
+      const subcategorias = await categoriasRepository.contarSubcategorias(id, tx)
+      if (subcategorias > 0) {
+        throw new ConflictError(
+          `No se puede eliminar: la categoría tiene ${subcategorias} subcategoría(s). Elimínalas primero.`
+        )
+      }
+      await categoriasRepository.softDelete(id, usuarioId, tx)
+    })
   },
 }

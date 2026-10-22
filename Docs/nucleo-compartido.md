@@ -14,7 +14,8 @@ Definir la **Obra** —raíz de todo el sistema: toda inspección, hallazgo, vis
 ## 3. Glosario
 
 - **Obra**: proyecto/faena de construcción con un identificador propio (`codigo`), estado de avance y titulares de notificación.
-- **Titular de obra**: usuario asignado a un `RolObra` (Administrador, Jefe de Terreno, Prevencionista) para efectos de notificación automática.
+- **Acceso a obra** (`UsuarioObra`): **pertenencia** de un usuario a una obra. En Etapa 1 su uso es acotar quién puede ser **titular** (y, a futuro, destinatario de notificaciones); **no** es un filtro de autorización operativa por obra —el acceso a los módulos lo gobierna el **Perfil** (funciones), no `UsuarioObra` (ver §6).
+- **Titular de obra** (`ObraTitular`): usuario asignado a un `RolObra` (Administrador, Jefe de Terreno, Prevencionista) para notificación automática. **Un titular por rol por obra**, elegido **solo entre los usuarios con acceso** a esa obra.
 - **Estado de obra**: fase administrativa de la obra (Sin iniciar → En ejecución → Suspendida/Terminada). NO es el semáforo de cumplimiento (ese es derivado de las visitas, va en Analítica).
 
 ## 4. Modelo de datos
@@ -48,25 +49,38 @@ model Obra {
   eliminadoPor         String?
 }
 
-// Asignación de titulares (absorbe el antiguo mantenedor "Asignaciones").
-// Varios usuarios pueden compartir un mismo RolObra en una obra; un mismo
-// usuario puede ocupar más de un rol. El @@unique solo evita duplicar la misma
-// persona en el mismo rol de la misma obra.
+// ACCESO usuario↔obra (22-10-2026): pertenencia pura, SIN rol. Es lo que define
+// qué usuarios pueden entrar a la obra. Unicidad (obraId, usuarioId) entre las vivas
+// (índice único PARCIAL en la migración, respeta soft-delete).
 model UsuarioObra {
-  id           Int      @id @default(autoincrement())
-  usuarioId    String
-  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
-  obraId       Int
-  obra         Obra     @relation(fields: [obraId], references: [id])
-  rolObra        RolObra
+  id             Int      @id @default(autoincrement())
+  usuarioId      String
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
+  obraId         Int
+  obra           Obra     @relation(fields: [obraId], references: [id])
   creadoEn       DateTime  @default(now())
   creadoPor      String?
   actualizadoEn  DateTime? @updatedAt
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
+}
 
-  @@unique([obraId, rolObra, usuarioId])
+// TITULAR por rol (22-10-2026): un usuario por RolObra por obra (índice único
+// PARCIAL (obraId, rolObra)). El usuario titular DEBE tener acceso (UsuarioObra).
+model ObraTitular {
+  id             Int      @id @default(autoincrement())
+  obraId         Int
+  obra           Obra     @relation(fields: [obraId], references: [id])
+  rolObra        RolObra
+  usuarioId      String
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
+  creadoEn       DateTime  @default(now())
+  creadoPor      String?
+  actualizadoEn  DateTime? @updatedAt
+  actualizadoPor String?
+  eliminadoEn    DateTime?
+  eliminadoPor   String?
 }
 
 enum RolObra {
@@ -76,21 +90,22 @@ enum RolObra {
 }
 ```
 
-> Cambios respecto al modelo provisional: `activo` (boolean) → `estado` (enum); se agregan `codigo` (único/obligatorio), `mandante`, `fechaTerminoEstimada` y auditoría completa. En `UsuarioObra` el `@@unique([obraId, rolObra])` pasa a `@@unique([obraId, rolObra, usuarioId])` (varios titulares por rol) y se agrega soft-delete + auditoría.
+> **Rework de permisos por obra (22-10-2026, decisión de Christian):** se **separó acceso de titular**. Antes `UsuarioObra` llevaba el `rolObra` (cada fila = titular con rol, varios por rol). Ahora `UsuarioObra` es **acceso puro** (pertenencia usuario↔obra) y los **titulares** viven en `ObraTitular` con **un usuario por rol** (`@@unique([obraId, rolObra])` como índice parcial). El titular se elige **solo entre los usuarios con acceso** a esa obra. Revocar el acceso retira (soft) las titularidades de ese usuario en la obra. Supersede el modelo previo de "varios titulares por rol en UsuarioObra".
 
 ## 5. Flujos
 
 1. **Crear obra** (Administrador): `codigo` + nombre + datos; nace en `SIN_INICIAR`. Los titulares se asignan en un **segundo paso**, desde el detalle de la obra (`/obras/:id`) — flujo en dos pasos en Etapa 1; la asignación inline dentro del alta queda como mejora futura (QA-OBR-006, 06-10-2026).
-2. **Asignar titulares**: por cada `RolObra`, agregar uno o más usuarios. Reemplazar/quitar no borra el historial de notificaciones ya enviadas (ese historial vive en `alertas`, pendiente).
+2. **Dar acceso y asignar titulares** (desde "Permisos Obra"): primero se concede **acceso** a los usuarios de la obra (`UsuarioObra`); luego se asigna **un titular por rol** (`ObraTitular`), elegido entre los usuarios con acceso. Asignar un rol que ya tiene titular lo **reemplaza**; revocar el acceso retira las titularidades de ese usuario. Reemplazar/quitar no borra el historial de notificaciones ya enviadas (vive en `alertas`, pendiente).
 3. **Cambiar estado**: Sin iniciar → En ejecución → Suspendida/Terminada (transición libre entre estados, sin máquina rígida en Etapa 1).
 4. **Panel de obras y resumen**: lista las obras con su estado; el cumplimiento (semáforo AL DÍA/PENDIENTE) se deriva de las visitas (módulos Prevención/Técnica), no de `estado`.
 
 ## 6. Reglas
 
-- **Auditoría + soft-delete para TODO registro** (decisión canónica 06-10-2026): toda tabla de negocio lleva `creadoEn/creadoPor`, `actualizadoEn/actualizadoPor`, `eliminadoEn/eliminadoPor`; nunca `DELETE` físico. `creadoPor`/`actualizadoPor`/`eliminadoPor` = `usuarioId` (cuid) del actor. Aplica a Obra y UsuarioObra ya; el *retrofit* de las tablas existentes queda como tarea (ver §10 y CLAUDE.md §11).
+- **Auditoría + soft-delete para toda ENTIDAD PRINCIPAL de negocio** (decisión canónica 06-10-2026, precisada 22-10-2026): toda tabla de negocio principal lleva `creadoEn/creadoPor`, `actualizadoEn/actualizadoPor`, `eliminadoEn/eliminadoPor`; nunca `DELETE` físico. `creadoPor`/`actualizadoPor`/`eliminadoPor` = `usuarioId` (cuid) del actor. **Excepción (precisión 22-10-2026):** los **blobs/registros hijos efímeros** que un spec de módulo declare explícitamente como tales —p. ej. las **fotos** de un hallazgo (`HallazgoFoto`/`HallazgoPrevencionFoto` y sus `*Data`)— pueden borrarse **físicamente** sin auditoría propia; la trazabilidad vive en la entidad padre (auditada y soft-deleted). Así está declarado en `tecnica.md §6` y `prevencion.md §6`. Aplica a Obra, UsuarioObra, ObraTitular ya; el *retrofit* de tablas existentes queda como tarea (ver §10 y CLAUDE.md §11).
 - **Código**: `codigo` obligatorio y único por obra.
-- **Titulares**: 3 roles (`ADMINISTRADOR`, `JEFE_DE_TERRENO`, `PREVENCIONISTA`). Se permiten **varios usuarios por rol**; un usuario puede tener más de un rol. **Bloqueo blando**: una obra puede guardarse sin los 3 roles cubiertos, pero el sistema **advierte** mientras falte al menos un titular en algún rol (no impide operar en Etapa 1).
-- **Validación de nivel por rol** (usuarios-perfiles.md §7): no se puede asignar como `PREVENCIONISTA` a un usuario con `nivelPrevencion = SIN_ACCESO`, ni como `JEFE_DE_TERRENO` a uno con `nivelTecnica = SIN_ACCESO`. `ADMINISTRADOR` no tiene restricción de área.
+- **Acceso**: `UsuarioObra` asocia usuarios a la obra y es el **conjunto elegible para titular**. Administrar accesos y titulares requiere **Administrador** (`requireAdmin`). **Alcance Etapa 1 (22-10-2026):** el acceso NO restringe por sí mismo la lectura/operación de obras ni de visitas —eso lo gobierna el Perfil (funciones `OBRAS`, `PREV_INSPECCION`, `TEC_INSPECCION`). El *scoping operativo por obra* (que un inspector solo vea/opere sus obras asignadas) queda como **mejora futura** si se requiere; no está comprometido en Etapa 1.
+- **Titulares**: 3 roles (`ADMINISTRADOR`, `JEFE_DE_TERRENO`, `PREVENCIONISTA`), **un usuario por rol por obra** (22-10-2026; reemplaza "varios por rol"). El titular debe tener **acceso** a la obra. **Bloqueo blando**: la obra puede guardarse sin los 3 roles cubiertos, pero el sistema **advierte** mientras falte alguno (no impide operar en Etapa 1).
+- **Validación de área por rol** (usuarios-perfiles.md §7, modelo v2): no se puede asignar como `PREVENCIONISTA` a un usuario con el **Área Prevención deshabilitada** en su perfil, ni como `JEFE_DE_TERRENO` con el **Área Técnica deshabilitada**. `ADMINISTRADOR` no tiene restricción de área. `esAdmin` pasa siempre.
 - **Borrado de obra**: soft-delete. Una obra con inspecciones registradas (RespuestaFormulario u otras) **no se elimina**; se cambia su `estado` (p. ej. a `TERMINADA`) o se desactiva vía soft-delete solo si no tiene registros. (Mismo criterio que Usuario.)
 - **Autorización**: administrar obras y titulares requiere **Administrador** (TOTAL en ambas áreas) → `requireAdmin`. Lectura del listado: cualquier usuario autenticado (alimenta selects y panel).
 

@@ -41,7 +41,24 @@ export default async function obrasRoutes(app: FastifyInstance) {
     obrasController.eliminar
   )
 
-  // Titulares de la obra (absorbe el antiguo mantenedor "Asignaciones").
+  // Acceso de usuarios a la obra (pertenencia, sin rol) — solo Administrador.
+  app.get(
+    '/obras/:id/accesos',
+    { preHandler: [requireAuth, requireAdmin], schema: { tags: ['nucleo'], summary: 'Listar usuarios con acceso a la obra' } },
+    obrasController.listarAccesos
+  )
+  app.post(
+    '/obras/:id/accesos',
+    { preHandler: [requireAuth, requireAdmin], schema: { tags: ['nucleo'], summary: 'Conceder acceso a un usuario' } },
+    obrasController.agregarAcceso
+  )
+  app.delete(
+    '/obras/:id/accesos/:accesoId',
+    { preHandler: [requireAuth, requireAdmin], schema: { tags: ['nucleo'], summary: 'Revocar acceso de un usuario' } },
+    obrasController.quitarAcceso
+  )
+
+  // Titulares por rol de la obra (notificaciones). Se eligen entre quienes tienen acceso.
   app.get(
     '/obras/:id/titulares',
     { preHandler: [requireAuth, requireAdmin], schema: { tags: ['nucleo'], summary: 'Listar titulares de la obra' } },

@@ -4,6 +4,9 @@ import type { PaginationQuery } from '../../../shared/pagination.js'
 import { toPrismaRange } from '../../../shared/pagination.js'
 import type { ActualizarCategoriaInput } from './categorias-formulario.schema.js'
 
+/** Cliente Prisma o de transacción (para el lock por fila en la baja). */
+type DbClient = Prisma.TransactionClient | typeof prisma
+
 /** Acceso a datos de CategoriaFormulario (CLAUDE.md §12.2). */
 export const categoriasRepository = {
   async listar(pagination: PaginationQuery, q?: string, areaId?: number, codigosArea?: string[]) {
@@ -74,8 +77,21 @@ export const categoriasRepository = {
     return existente !== null
   },
 
-  async contarFormularios(categoriaId: number) {
-    return prisma.formulario.count({ where: { categoriaId, eliminadoEn: null } })
+  /** Bloquea la fila de la categoría (FOR UPDATE) para serializar la baja frente
+   *  al alta de subcategorías, que bloquea esa misma fila (QA-OKA-006). */
+  async lockCategoria(tx: Prisma.TransactionClient, id: number): Promise<boolean> {
+    const rows = await tx.$queryRaw<
+      Array<{ id: number }>
+    >`SELECT id FROM "CategoriaFormulario" WHERE id = ${id} AND "eliminadoEn" IS NULL FOR UPDATE`
+    return rows.length > 0
+  },
+
+  async contarFormularios(categoriaId: number, db: DbClient = prisma) {
+    return db.formulario.count({ where: { categoriaId, eliminadoEn: null } })
+  },
+
+  async contarSubcategorias(categoriaId: number, db: DbClient = prisma) {
+    return db.subcategoriaFormulario.count({ where: { categoriaId, eliminadoEn: null } })
   },
 
   async crear(data: { areaId: number; codigo: string; nombre: string; activo: boolean; creadoPor: string }) {
@@ -103,8 +119,8 @@ export const categoriasRepository = {
     })
   },
 
-  async softDelete(id: number, eliminadoPor: string) {
-    return prisma.categoriaFormulario.update({
+  async softDelete(id: number, eliminadoPor: string, db: DbClient = prisma) {
+    return db.categoriaFormulario.update({
       where: { id },
       data: { eliminadoEn: new Date(), eliminadoPor },
     })
