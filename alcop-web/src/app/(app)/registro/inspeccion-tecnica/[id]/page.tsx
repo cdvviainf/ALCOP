@@ -37,10 +37,12 @@ interface Foto {
   orden: number
   url: string
 }
+type TipoRegistro = 'HALLAZGO' | 'NOTA_TECNICA'
 interface Hallazgo {
   id: number
   loteUnidad: { id: number; descripcion: string }
-  tipoHallazgo: { id: number; nombre: string }
+  tipoRegistro: TipoRegistro
+  tipoHallazgo: { id: number; nombre: string } | null
   comentario: string | null
   fotos: Foto[]
 }
@@ -66,11 +68,17 @@ interface TipoHallazgo {
 
 const CALIDADES = ['ORIGINAL', 'OPTIMIZADA', 'MEDIA', 'BAJA']
 
-/** Agrupa hallazgos por tipo, preservando el orden de aparición de cada tipo. */
+/** Etiqueta de grupo: las notas técnicas van juntas; los hallazgos por su tipo. */
+function etiquetaGrupo(h: Hallazgo): string {
+  if (h.tipoRegistro === 'NOTA_TECNICA') return 'Notas técnicas'
+  return h.tipoHallazgo?.nombre ?? 'Sin tipo'
+}
+
+/** Agrupa hallazgos/notas, preservando el orden de aparición de cada grupo. */
 function agruparPorTipo(hallazgos: Hallazgo[]): Array<{ tipo: string; items: Hallazgo[] }> {
   const map = new Map<string, Hallazgo[]>()
   for (const h of hallazgos) {
-    const k = h.tipoHallazgo.nombre
+    const k = etiquetaGrupo(h)
     if (!map.has(k)) map.set(k, [])
     map.get(k)!.push(h)
   }
@@ -212,7 +220,24 @@ export default function VisitaDetallePage({ params }: { params: Promise<{ id: st
                   <div key={h.id} className="rounded-xl border border-border bg-card p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <span className="font-semibold text-foreground">{h.loteUnidad.descripcion}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-foreground">{h.loteUnidad.descripcion}</span>
+                          <span
+                            className={cn(
+                              'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide',
+                              h.tipoRegistro === 'NOTA_TECNICA' ? 'bg-secondary text-muted-foreground' : 'bg-warn-bg text-warn-fg'
+                            )}
+                          >
+                            {h.tipoRegistro === 'NOTA_TECNICA' ? 'NOTA TÉCNICA' : 'HALLAZGO'}
+                          </span>
+                          {/* Prompt accionable solo en visitas editables; en FINALIZADA
+                              (histórica, grandfathered) sería ruido engañoso (QA-VT-001). */}
+                          {editable && h.tipoRegistro === 'HALLAZGO' && h.fotos.length === 0 ? (
+                            <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                              Falta foto
+                            </span>
+                          ) : null}
+                        </div>
                         {h.comentario ? (
                           <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground">{h.comentario}</p>
                         ) : (
@@ -304,19 +329,31 @@ function AgregarHallazgo({
   onAdded: () => void
 }) {
   const [loteUnidadId, setLoteUnidadId] = useState<string | undefined>(undefined)
+  const [tipoRegistro, setTipoRegistro] = useState<TipoRegistro>('HALLAZGO')
   const [tipoId, setTipoId] = useState<string | undefined>(undefined)
   const [comentario, setComentario] = useState('')
+
+  const esHallazgo = tipoRegistro === 'HALLAZGO'
+  // HALLAZGO: unidad + tipo + comentario (y foto, exigida al finalizar).
+  // NOTA_TECNICA: unidad + comentario (foto opcional). Comentario obligatorio en ambos.
+  const puedeAgregar = Boolean(loteUnidadId) && comentario.trim().length > 0 && (!esHallazgo || Boolean(tipoId))
 
   const crear = useMutation({
     mutationFn: () =>
       api
         .post(`tecnica/visitas/${visitaId}/hallazgos`, {
-          json: { loteUnidadId: Number(loteUnidadId), tipoHallazgoId: Number(tipoId), comentario: comentario.trim() || null },
+          json: {
+            loteUnidadId: Number(loteUnidadId),
+            tipoRegistro,
+            tipoHallazgoId: esHallazgo ? Number(tipoId) : null,
+            comentario: comentario.trim(),
+          },
         })
         .json(),
     onSuccess: () => {
-      toast.success('Hallazgo agregado.')
+      toast.success(esHallazgo ? 'Hallazgo agregado.' : 'Nota técnica agregada.')
       setLoteUnidadId(undefined)
+      setTipoRegistro('HALLAZGO')
       setTipoId(undefined)
       setComentario('')
       onAdded()
@@ -326,7 +363,7 @@ function AgregarHallazgo({
 
   return (
     <div className="rounded-xl border border-dashed border-border bg-card p-5">
-      <h2 className="text-sm font-bold text-foreground">Agregar hallazgo</h2>
+      <h2 className="text-sm font-bold text-foreground">Agregar registro</h2>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Unidad de lote</Label>
@@ -348,6 +385,24 @@ function AgregarHallazgo({
           </Select>
         </div>
         <div className="space-y-1.5">
+          <Label>Tipo de registro</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {(['HALLAZGO', 'NOTA_TECNICA'] as const).map((tr) => (
+              <Button
+                key={tr}
+                type="button"
+                variant={tipoRegistro === tr ? 'default' : 'outline'}
+                className="h-10"
+                onClick={() => setTipoRegistro(tr)}
+              >
+                {tr === 'HALLAZGO' ? 'Hallazgo' : 'Nota técnica'}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {esHallazgo ? (
+        <div className="mt-3 space-y-1.5">
           <Label>Tipo de hallazgo</Label>
           <Select
             value={tipoId}
@@ -366,7 +421,7 @@ function AgregarHallazgo({
             </SelectContent>
           </Select>
         </div>
-      </div>
+      ) : null}
       <div className="mt-3 space-y-1.5">
         <Label htmlFor="h-com">Comentario</Label>
         <textarea
@@ -374,12 +429,17 @@ function AgregarHallazgo({
           rows={2}
           value={comentario}
           onChange={(e) => setComentario(e.target.value)}
-          placeholder="Observación (opcional si agregas foto)"
+          placeholder="Comentario (obligatorio)"
           className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
+        {esHallazgo ? (
+          <p className="text-xs text-muted-foreground">
+            Un hallazgo requiere al menos una foto; se agrega abajo y se valida al finalizar.
+          </p>
+        ) : null}
       </div>
       <div className="mt-3 flex justify-end">
-        <Button disabled={!loteUnidadId || !tipoId || crear.isPending} onClick={() => crear.mutate()}>
+        <Button disabled={!puedeAgregar || crear.isPending} onClick={() => crear.mutate()}>
           {crear.isPending ? <Loader2 className="animate-spin" /> : <Plus strokeWidth={2.5} />}
           Agregar
         </Button>
@@ -602,8 +662,14 @@ function EditarHallazgoDialog({
   onCancel: () => void
 }) {
   const [loteUnidadId, setLoteUnidadId] = useState(String(hallazgo.loteUnidad.id))
-  const [tipoId, setTipoId] = useState(String(hallazgo.tipoHallazgo.id))
+  const [tipoRegistro, setTipoRegistro] = useState<TipoRegistro>(hallazgo.tipoRegistro)
+  const [tipoId, setTipoId] = useState<string | undefined>(
+    hallazgo.tipoHallazgo ? String(hallazgo.tipoHallazgo.id) : undefined
+  )
   const [comentario, setComentario] = useState(hallazgo.comentario ?? '')
+
+  const esHallazgo = tipoRegistro === 'HALLAZGO'
+  const puedeGuardar = comentario.trim().length > 0 && (!esHallazgo || Boolean(tipoId))
 
   const guardar = useMutation({
     mutationFn: () =>
@@ -611,13 +677,14 @@ function EditarHallazgoDialog({
         .patch(`tecnica/visitas/${visitaId}/hallazgos/${hallazgo.id}`, {
           json: {
             loteUnidadId: Number(loteUnidadId),
-            tipoHallazgoId: Number(tipoId),
-            comentario: comentario.trim() || null,
+            tipoRegistro,
+            tipoHallazgoId: esHallazgo ? Number(tipoId) : null,
+            comentario: comentario.trim(),
           },
         })
         .json(),
     onSuccess: () => {
-      toast.success('Hallazgo actualizado.')
+      toast.success('Registro actualizado.')
       onDone()
     },
     onError: (err: Error) => toast.error(err.message || 'No se pudo actualizar.'),
@@ -626,7 +693,7 @@ function EditarHallazgoDialog({
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Editar hallazgo</DialogTitle>
+        <DialogTitle>Editar registro</DialogTitle>
       </DialogHeader>
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -650,6 +717,24 @@ function EditarHallazgoDialog({
             </Select>
           </div>
           <div className="space-y-1.5">
+            <Label>Tipo de registro</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['HALLAZGO', 'NOTA_TECNICA'] as const).map((tr) => (
+                <Button
+                  key={tr}
+                  type="button"
+                  variant={tipoRegistro === tr ? 'default' : 'outline'}
+                  className="h-10"
+                  onClick={() => setTipoRegistro(tr)}
+                >
+                  {tr === 'HALLAZGO' ? 'Hallazgo' : 'Nota técnica'}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+        {esHallazgo ? (
+          <div className="space-y-1.5">
             <Label>Tipo de hallazgo</Label>
             <Select
               value={tipoId}
@@ -657,7 +742,7 @@ function EditarHallazgoDialog({
               items={Object.fromEntries(tipos.map((t) => [String(t.id), t.nombre]))}
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue placeholder="Selecciona…" />
               </SelectTrigger>
               <SelectContent>
                 {tipos.map((t) => (
@@ -668,7 +753,7 @@ function EditarHallazgoDialog({
               </SelectContent>
             </Select>
           </div>
-        </div>
+        ) : null}
         <div className="space-y-1.5">
           <Label htmlFor="eh-com">Comentario</Label>
           <textarea
@@ -676,6 +761,7 @@ function EditarHallazgoDialog({
             rows={3}
             value={comentario}
             onChange={(e) => setComentario(e.target.value)}
+            placeholder="Comentario (obligatorio)"
             className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
@@ -684,7 +770,7 @@ function EditarHallazgoDialog({
         <Button variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button disabled={guardar.isPending} onClick={() => guardar.mutate()}>
+        <Button disabled={!puedeGuardar || guardar.isPending} onClick={() => guardar.mutate()}>
           {guardar.isPending ? <Loader2 className="animate-spin" /> : null}
           Guardar
         </Button>

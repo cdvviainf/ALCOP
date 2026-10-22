@@ -479,6 +479,13 @@ enum CalidadImagen {
   BAJA
 }
 
+// Tipo de registro de una entrada de visita técnica (tecnica.md §7):
+// HALLAZGO exige comentario + foto; NOTA_TECNICA exige comentario, foto opcional.
+enum TipoRegistroHallazgo {
+  HALLAZGO
+  NOTA_TECNICA
+}
+
 // Unidad individual de lote, autogenerada desde ObraLote (ej. "Casa 001").
 model LoteUnidad {
   id          Int       @id @default(autoincrement())
@@ -521,8 +528,10 @@ model HallazgoTecnico {
   visita         VisitaTecnica       @relation(fields: [visitaId], references: [id])
   loteUnidadId   Int
   loteUnidad     LoteUnidad          @relation(fields: [loteUnidadId], references: [id])
-  tipoHallazgoId Int
-  tipoHallazgo   TipoHallazgoTecnico @relation(fields: [tipoHallazgoId], references: [id])
+  // tipoRegistro clasifica la entrada; tipoHallazgo (catálogo) solo aplica a HALLAZGO.
+  tipoRegistro   TipoRegistroHallazgo @default(HALLAZGO)
+  tipoHallazgoId Int?
+  tipoHallazgo   TipoHallazgoTecnico? @relation(fields: [tipoHallazgoId], references: [id])
   comentario     String?
   orden          Int                 @default(0)
   fotos          HallazgoFoto[]

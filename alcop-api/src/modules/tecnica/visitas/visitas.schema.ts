@@ -9,6 +9,7 @@ const MSG_HORAS = { message: 'La hora de término no puede ser anterior al inici
 
 export const estadoVisitaSchema = z.enum(['EN_CURSO', 'FINALIZADA'])
 export const calidadImagenSchema = z.enum(['ORIGINAL', 'OPTIMIZADA', 'MEDIA', 'BAJA'])
+export const tipoRegistroSchema = z.enum(['HALLAZGO', 'NOTA_TECNICA'])
 
 export const listarVisitasQuerySchema = paginationQuerySchema.extend({
   q: z.string().trim().min(1).optional(),
@@ -58,17 +59,31 @@ export const finalizarVisitaSchema = z.object({
   resumenFinal: z.string().trim().min(1).nullable().optional(),
 })
 
-export const crearHallazgoSchema = z.object({
-  loteUnidadId: z.coerce.number().int().positive(),
-  tipoHallazgoId: z.coerce.number().int().positive(),
-  comentario: z.string().trim().min(1).nullable().optional(),
-})
+// Tipo de registro (tecnica.md §7): HALLAZGO exige tipo de hallazgo + comentario
+// + foto (la foto se valida al finalizar); NOTA_TECNICA exige solo comentario.
+export const crearHallazgoSchema = z
+  .object({
+    loteUnidadId: z.coerce.number().int().positive(),
+    tipoRegistro: tipoRegistroSchema,
+    tipoHallazgoId: z.coerce.number().int().positive().nullable().optional(),
+    comentario: z.string().trim().min(1, 'El comentario es obligatorio'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.tipoRegistro === 'HALLAZGO' && !data.tipoHallazgoId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El tipo de hallazgo es obligatorio.',
+        path: ['tipoHallazgoId'],
+      })
+    }
+  })
 
 export const actualizarHallazgoSchema = z
   .object({
     loteUnidadId: z.coerce.number().int().positive().optional(),
-    tipoHallazgoId: z.coerce.number().int().positive().optional(),
-    comentario: z.string().trim().min(1).nullable().optional(),
+    tipoRegistro: tipoRegistroSchema.optional(),
+    tipoHallazgoId: z.coerce.number().int().positive().nullable().optional(),
+    comentario: z.string().trim().min(1).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'Debe enviar al menos un campo a actualizar' })
 

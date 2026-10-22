@@ -150,6 +150,18 @@ export function FormularioBuilder({
   })
   const { fields, append, remove, move } = useFieldArray({ control, name: 'preguntas' })
 
+  // Agrega una pregunta y lleva el foco/scroll a ella: el botón del final evita
+  // tener que volver arriba al armar plantillas largas.
+  const agregarPregunta = () => {
+    const nuevoIndex = fields.length
+    append({ ...PREGUNTA_VACIA })
+    setTimeout(() => {
+      const el = document.getElementById(`p-${nuevoIndex}-texto`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      ;(el as HTMLInputElement | null)?.focus()
+    }, 50)
+  }
+
   const areaId = watch('areaId')
   const preguntas = watch('preguntas')
 
@@ -366,7 +378,7 @@ export function FormularioBuilder({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-foreground">Preguntas</h2>
           {preguntasEditables ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => append({ ...PREGUNTA_VACIA })}>
+            <Button type="button" variant="outline" size="sm" onClick={agregarPregunta}>
               <Plus className="size-4" />
               Agregar pregunta
             </Button>
@@ -515,6 +527,10 @@ export function FormularioBuilder({
               </div>
             )
           })}
+          <Button type="button" variant="outline" size="sm" onClick={agregarPregunta}>
+            <Plus className="size-4" />
+            Nueva pregunta
+          </Button>
         </div>
         )}
       </section>

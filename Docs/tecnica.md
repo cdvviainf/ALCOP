@@ -20,7 +20,7 @@ Un inspector (función Técnica) va a una obra, recorre **unidades de lote** (Ca
 
 - **Visita Técnica**: una inspección a una obra en una fecha, con hora de inicio/término, sus hallazgos y un resumen final.
 - **Unidad de lote (`LoteUnidad`)**: unidad individual **autogenerada** desde la composición de la obra (`ObraLote`): para `90 Casas` se crean `Casa 001`…`Casa 090`. Es lo que se inspecciona.
-- **Hallazgo técnico**: una observación dentro de una visita — unidad de lote + tipo de hallazgo + fotos + comentario.
+- **Registro de visita**: una entrada dentro de una visita sobre una unidad de lote. Tiene un **tipo de registro**: **Hallazgo** (defecto/no conformidad — exige tipo de hallazgo + comentario + ≥1 foto) o **Nota técnica** (observación — comentario obligatorio, foto opcional, sin tipo de hallazgo). "Hallazgo" se usa como término genérico de la entrada por compatibilidad del modelo (`HallazgoTecnico`).
 - **Calidad de imagen**: nivel de compresión al subir una foto (Original / Optimizada / Media / Baja). El sistema sugiere un default configurable.
 - **Reporte de visita**: documento de secciones fijas derivado de la visita (datos, lotes inspeccionados, hallazgos por tipo, resumen final). HTML en pantalla + exportable a PDF.
 
@@ -76,18 +76,27 @@ model VisitaTecnica {
   eliminadoPor   String?
 }
 
+// Tipo de registro de una entrada de visita (22-10-2026):
+//   HALLAZGO     → exige tipo de hallazgo + comentario + ≥1 foto (foto validada al finalizar).
+//   NOTA_TECNICA → exige comentario; foto opcional; sin tipo de hallazgo.
+enum TipoRegistroHallazgo {
+  HALLAZGO
+  NOTA_TECNICA
+}
+
 model HallazgoTecnico {
-  id              Int                 @id @default(autoincrement())
+  id              Int                  @id @default(autoincrement())
   visitaId        Int
-  visita          VisitaTecnica       @relation(fields: [visitaId], references: [id])
+  visita          VisitaTecnica        @relation(fields: [visitaId], references: [id])
   loteUnidadId    Int
-  loteUnidad      LoteUnidad          @relation(fields: [loteUnidadId], references: [id])
-  tipoHallazgoId  Int
-  tipoHallazgo    TipoHallazgoTecnico @relation(fields: [tipoHallazgoId], references: [id])
-  comentario      String?             // (futuro: autogenerado por IA desde la foto)
-  orden           Int                 @default(0)
+  loteUnidad      LoteUnidad           @relation(fields: [loteUnidadId], references: [id])
+  tipoRegistro    TipoRegistroHallazgo @default(HALLAZGO)
+  tipoHallazgoId  Int?                 // solo para HALLAZGO; null en NOTA_TECNICA
+  tipoHallazgo    TipoHallazgoTecnico? @relation(fields: [tipoHallazgoId], references: [id])
+  comentario      String?              // obligatorio al crear ambos tipos (futuro: autogenerado por IA)
+  orden           Int                  @default(0)
   fotos           HallazgoFoto[]
-  creadoEn        DateTime            @default(now())
+  creadoEn        DateTime             @default(now())
   eliminadoEn     DateTime?
 }
 
@@ -138,12 +147,13 @@ model Configuracion {
    - cantidad baja de A→B: se eliminan (soft) las unidades `>B` **que no tengan hallazgos**; si alguna con `>B` tiene hallazgos, se **rechaza** la reducción (409).
    - quitar el lote: elimina sus unidades si ninguna tiene hallazgos; si no, se rechaza.
 2. **Crear visita** (`TEC_INSPECCION` TOTAL): obra + fecha + hora inicio/término → nace `EN_CURSO`. El inspector es el usuario de la sesión.
-3. **Agregar hallazgo**: unidad de lote (de la obra de la visita) + tipo de hallazgo + comentario; sube 1..N fotos (cada una con su calidad; el backend la optimiza y guarda en BD).
+3. **Agregar registro**: unidad de lote (de la obra de la visita) + **tipo de registro**. Si es **Hallazgo**: tipo de hallazgo + comentario (obligatorios) y ≥1 foto (la foto se sube en paso aparte y su obligatoriedad se valida al finalizar). Si es **Nota técnica**: comentario obligatorio, foto opcional, sin tipo de hallazgo. Las fotos se suben 1..N (cada una con su calidad; el backend la optimiza y guarda en BD).
 4. **Finalizar visita**: el inspector escribe el `resumenFinal` y marca `FINALIZADA` → queda solo lectura.
 5. **Reporte**: `GET /visitas/:id/reporte` (datos para pantalla) y `GET /visitas/:id/reporte.pdf` (HTML→PDF). Secciones fijas:
    - **Encabezado**: inspector (usuario), obra, fecha, hora inicio/término.
    - **Lotes inspeccionados**: unidades distintas con hallazgos en la visita.
-   - **Hallazgos por tipo**: agrupados por `TipoHallazgoTecnico`, cada uno con unidad, comentario y fotos.
+   - **Hallazgos por tipo**: solo registros `HALLAZGO`, agrupados por `TipoHallazgoTecnico`, cada uno con unidad, comentario y fotos.
+   - **Notas técnicas**: registros `NOTA_TECNICA`, con unidad, comentario y fotos (si las hay).
    - **Resumen final**: el texto digitado por el inspector.
 6. **Configuración**: `esAdmin` consulta/cambia `calidad_imagen_default` (pantalla de Configuración).
 
@@ -160,9 +170,10 @@ model Configuracion {
 ## 7. Validaciones
 
 - Visita: `obraId` existente; `fecha` obligatoria; `horaTermino >= horaInicio` si ambas vienen; estado ∈ enum.
-- Hallazgo: `loteUnidadId` pertenece a la **obra de la visita**; `tipoHallazgoId` activo; al menos el comentario **o** una foto (no vacío del todo — confirmar al construir si se exige foto).
+- Registro: `loteUnidadId` pertenece a la **obra de la visita**; `comentario` **obligatorio** en ambos tipos. Si `tipoRegistro = HALLAZGO`: `tipoHallazgoId` **obligatorio** y activo, y **≥1 foto** (la foto se valida al **finalizar**, porque se sube en paso aparte). Si `tipoRegistro = NOTA_TECNICA`: sin `tipoHallazgoId`, foto opcional.
 - Foto: `mimetype` image/*; `calidad` ∈ enum; tamaño de entrada ≤ límite.
-- Finalizar: la visita debe tener al menos un hallazgo (confirmar). `resumenFinal` recomendado (¿obligatorio al finalizar? — ver pendientes).
+- Finalizar: la visita debe tener **al menos un registro** (hallazgo **o** nota técnica) — **decisión 22-10-2026:** se permiten visitas compuestas solo por notas técnicas (una visita puede arrojar solo observaciones; resuelve el "confirmar" previo). Además, al finalizar: todo registro debe tener comentario y todo `HALLAZGO` debe tener ≥1 foto. `resumenFinal` recomendado (¿obligatorio al finalizar? — ver pendientes).
+- **Transición / grandfathering (22-10-2026):** los registros creados antes de esta regla quedan marcados `HALLAZGO` por la migración (default), **sin auto-reclasificación** a nota (no se puede inferir con certeza — CLAUDE.md §0). Las nuevas obligaciones (comentario + foto en HALLAZGO) aplican a registros creados/editados desde ahora y se **exigen al finalizar** una visita `EN_CURSO` (comportamiento deseado de calidad de datos: el inspector completa el dato o reclasifica a Nota técnica vía el diálogo de edición). Las visitas `FINALIZADA` históricas se respetan tal cual (solo lectura); el reporte muestra la verdad del dato ("Sin comentario" si aplica) y el badge "Falta foto" **no** se muestra en visitas no editables.
 
 ## 8. Estados
 
@@ -179,7 +190,7 @@ model Configuracion {
 
 ## 10. Pendientes
 
-- [ ] ¿Un hallazgo exige al menos una foto, o basta comentario? (hoy: al menos uno de los dos).
+- [x] ¿Un hallazgo exige al menos una foto? **Resuelto (22-10-2026):** depende del **tipo de registro** — HALLAZGO exige comentario + ≥1 foto (foto validada al finalizar); NOTA_TECNICA exige solo comentario. Reemplaza la regla previa "al menos uno de los dos".
 - [ ] ¿`resumenFinal` obligatorio para finalizar? (hoy: recomendado).
 - [ ] ¿Reapertura de visitas `FINALIZADA`?
 - [ ] Búsqueda/paginación en el selector de unidad de lote (una obra puede tener cientos de unidades).

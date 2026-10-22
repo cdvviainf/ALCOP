@@ -1,4 +1,4 @@
-import { Prisma, type CalidadImagen, type EstadoVisita } from '@prisma/client'
+import { Prisma, type CalidadImagen, type EstadoVisita, type TipoRegistroHallazgo } from '@prisma/client'
 import { env } from '../../../config/env.js'
 import { prisma } from '../../../lib/prisma.js'
 import { BusinessError, ConflictError, NotFoundError } from '../../../shared/errors.js'
@@ -31,8 +31,9 @@ type HallazgoRow = {
   id: number
   comentario: string | null
   orden: number
+  tipoRegistro: TipoRegistroHallazgo
   loteUnidad: { id: number; descripcion: string }
-  tipoHallazgo: { id: number; nombre: string }
+  tipoHallazgo: { id: number; nombre: string } | null
   fotos: FotoRow[]
 }
 type VisitaRow = {
@@ -65,6 +66,7 @@ function hallazgoToDTO(h: HallazgoRow): HallazgoDTO {
   return {
     id: h.id,
     loteUnidad: h.loteUnidad,
+    tipoRegistro: h.tipoRegistro,
     tipoHallazgo: h.tipoHallazgo,
     comentario: h.comentario,
     orden: h.orden,
@@ -188,12 +190,18 @@ export const visitasService = {
       await lockVisitaEnCurso(tx, id)
       const hallazgos = await visitasRepository.contarHallazgos(id, tx)
       if (hallazgos === 0) {
-        throw new ConflictError('No se puede finalizar una visita sin hallazgos.')
+        throw new ConflictError('No se puede finalizar una visita sin registros.')
       }
-      // Cada hallazgo debe tener al menos comentario o una foto (Docs/tecnica.md §7, QA-OLA-A-003).
-      const vacios = await visitasRepository.contarHallazgosVacios(id, tx)
-      if (vacios > 0) {
-        throw new ConflictError(`No se puede finalizar: ${vacios} hallazgo(s) no tienen comentario ni foto.`)
+      // Reglas por tipo de registro (Docs/tecnica.md §7): comentario obligatorio en
+      // ambos; foto obligatoria solo en HALLAZGO. Las fotos se suben en paso aparte,
+      // así que la obligatoriedad de foto se valida aquí, al cerrar.
+      const sinComentario = await visitasRepository.contarSinComentario(id, tx)
+      if (sinComentario > 0) {
+        throw new ConflictError(`No se puede finalizar: ${sinComentario} registro(s) sin comentario.`)
+      }
+      const sinFoto = await visitasRepository.contarHallazgosSinFoto(id, tx)
+      if (sinFoto > 0) {
+        throw new ConflictError(`No se puede finalizar: ${sinFoto} hallazgo(s) sin foto (los hallazgos requieren al menos una foto).`)
       }
       const row = await visitasRepository.finalizar(id, data.resumenFinal ?? null, actualizadoPor, tx)
       return detalleToDTO(row)
@@ -214,12 +222,18 @@ export const visitasService = {
       const { obraId } = await lockVisitaEnCurso(tx, visitaId)
       const unidad = await visitasRepository.loteUnidadDeObra(data.loteUnidadId, obraId, tx)
       if (!unidad) throw new ConflictError('La unidad de lote no pertenece a la obra de la visita.')
-      const tipo = await visitasRepository.tipoHallazgoActivo(data.tipoHallazgoId, tx)
-      if (!tipo) throw new NotFoundError('Tipo de hallazgo', String(data.tipoHallazgoId))
+      // El tipo de hallazgo (catálogo) solo aplica a HALLAZGO; en NOTA_TECNICA se ignora.
+      let tipoHallazgoId: number | null = null
+      if (data.tipoRegistro === 'HALLAZGO') {
+        if (!data.tipoHallazgoId) throw new BusinessError('VALIDATION_ERROR', 'El tipo de hallazgo es obligatorio.', 422)
+        const tipo = await visitasRepository.tipoHallazgoActivo(data.tipoHallazgoId, tx)
+        if (!tipo) throw new NotFoundError('Tipo de hallazgo', String(data.tipoHallazgoId))
+        tipoHallazgoId = data.tipoHallazgoId
+      }
       const orden = await visitasRepository.contarHallazgos(visitaId, tx)
       const row = await visitasRepository.crearHallazgo(
         visitaId,
-        { loteUnidadId: data.loteUnidadId, tipoHallazgoId: data.tipoHallazgoId, comentario: data.comentario ?? null },
+        { loteUnidadId: data.loteUnidadId, tipoRegistro: data.tipoRegistro, tipoHallazgoId, comentario: data.comentario },
         orden,
         tx
       )
@@ -240,11 +254,30 @@ export const visitasService = {
         const unidad = await visitasRepository.loteUnidadDeObra(data.loteUnidadId, obraId, tx)
         if (!unidad) throw new ConflictError('La unidad de lote no pertenece a la obra de la visita.')
       }
-      if (data.tipoHallazgoId !== undefined) {
-        const tipo = await visitasRepository.tipoHallazgoActivo(data.tipoHallazgoId, tx)
-        if (!tipo) throw new NotFoundError('Tipo de hallazgo', String(data.tipoHallazgoId))
+      // Resuelve el tipo de registro efectivo (el enviado o el actual) y, con él, el
+      // tipo de hallazgo: obligatorio+activo para HALLAZGO; forzado a null en NOTA_TECNICA.
+      const tipoRegistroEf = data.tipoRegistro ?? hallazgo.tipoRegistro
+      let tipoHallazgoIdEf: number | null
+      if (tipoRegistroEf === 'NOTA_TECNICA') {
+        tipoHallazgoIdEf = null
+      } else {
+        tipoHallazgoIdEf = data.tipoHallazgoId !== undefined ? data.tipoHallazgoId : hallazgo.tipoHallazgoId
+        if (!tipoHallazgoIdEf) {
+          throw new BusinessError('VALIDATION_ERROR', 'El tipo de hallazgo es obligatorio para un hallazgo.', 422)
+        }
+        const tipo = await visitasRepository.tipoHallazgoActivo(tipoHallazgoIdEf, tx)
+        if (!tipo) throw new NotFoundError('Tipo de hallazgo', String(tipoHallazgoIdEf))
       }
-      const row = await visitasRepository.actualizarHallazgo(hallazgoId, data, tx)
+      const row = await visitasRepository.actualizarHallazgo(
+        hallazgoId,
+        {
+          loteUnidadId: data.loteUnidadId,
+          tipoRegistro: tipoRegistroEf,
+          tipoHallazgoId: tipoHallazgoIdEf,
+          comentario: data.comentario,
+        },
+        tx
+      )
       return hallazgoToDTO(row)
     })
   },

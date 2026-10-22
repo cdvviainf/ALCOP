@@ -1,4 +1,4 @@
-import type { CalidadImagen, Prisma } from '@prisma/client'
+import type { CalidadImagen, Prisma, TipoRegistroHallazgo } from '@prisma/client'
 import { prisma } from '../../../lib/prisma.js'
 import type { PaginationQuery } from '../../../shared/pagination.js'
 import { toPrismaRange } from '../../../shared/pagination.js'
@@ -120,10 +120,17 @@ export const visitasRepository = {
     })
   },
 
-  /** Hallazgos "vacíos" de una visita: sin comentario y sin fotos (bloquean finalizar). */
-  async contarHallazgosVacios(visitaId: number, db: DbClient = prisma) {
+  /** Registros sin comentario (obligatorio en ambos tipos — bloquean finalizar). */
+  async contarSinComentario(visitaId: number, db: DbClient = prisma) {
     return db.hallazgoTecnico.count({
-      where: { visitaId, eliminadoEn: null, comentario: null, fotos: { none: {} } },
+      where: { visitaId, eliminadoEn: null, OR: [{ comentario: null }, { comentario: '' }] },
+    })
+  },
+
+  /** Hallazgos (no notas) sin ninguna foto (la foto es obligatoria para HALLAZGO). */
+  async contarHallazgosSinFoto(visitaId: number, db: DbClient = prisma) {
+    return db.hallazgoTecnico.count({
+      where: { visitaId, eliminadoEn: null, tipoRegistro: 'HALLAZGO', fotos: { none: {} } },
     })
   },
 
@@ -191,7 +198,12 @@ export const visitasRepository = {
 
   async crearHallazgo(
     visitaId: number,
-    data: { loteUnidadId: number; tipoHallazgoId: number; comentario: string | null },
+    data: {
+      loteUnidadId: number
+      tipoRegistro: TipoRegistroHallazgo
+      tipoHallazgoId: number | null
+      comentario: string
+    },
     orden: number,
     db: DbClient = prisma
   ) {
@@ -199,6 +211,7 @@ export const visitasRepository = {
       data: {
         visitaId,
         loteUnidadId: data.loteUnidadId,
+        tipoRegistro: data.tipoRegistro,
         tipoHallazgoId: data.tipoHallazgoId,
         comentario: data.comentario,
         orden,
@@ -210,19 +223,25 @@ export const visitasRepository = {
   async buscarHallazgo(hallazgoId: number, db: DbClient = prisma) {
     return db.hallazgoTecnico.findFirst({
       where: { id: hallazgoId, eliminadoEn: null },
-      select: { id: true, visitaId: true },
+      select: { id: true, visitaId: true, tipoRegistro: true, tipoHallazgoId: true },
     })
   },
 
   async actualizarHallazgo(
     hallazgoId: number,
-    data: { loteUnidadId?: number; tipoHallazgoId?: number; comentario?: string | null },
+    data: {
+      loteUnidadId?: number
+      tipoRegistro?: TipoRegistroHallazgo
+      tipoHallazgoId?: number | null
+      comentario?: string
+    },
     db: DbClient = prisma
   ) {
     return db.hallazgoTecnico.update({
       where: { id: hallazgoId },
       data: {
         ...(data.loteUnidadId !== undefined ? { loteUnidadId: data.loteUnidadId } : {}),
+        ...(data.tipoRegistro !== undefined ? { tipoRegistro: data.tipoRegistro } : {}),
         ...(data.tipoHallazgoId !== undefined ? { tipoHallazgoId: data.tipoHallazgoId } : {}),
         ...(data.comentario !== undefined ? { comentario: data.comentario } : {}),
       },

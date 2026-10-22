@@ -1,4 +1,4 @@
-import type { CalidadImagen, EstadoVisita } from '@prisma/client'
+import type { CalidadImagen, EstadoVisita, TipoRegistroHallazgo } from '@prisma/client'
 
 export interface FotoDTO {
   id: number
@@ -15,7 +15,9 @@ export interface FotoDTO {
 export interface HallazgoDTO {
   id: number
   loteUnidad: { id: number; descripcion: string }
-  tipoHallazgo: { id: number; nombre: string }
+  tipoRegistro: TipoRegistroHallazgo
+  /** Solo presente en HALLAZGO; null en NOTA_TECNICA. */
+  tipoHallazgo: { id: number; nombre: string } | null
   comentario: string | null
   orden: number
   fotos: FotoDTO[]

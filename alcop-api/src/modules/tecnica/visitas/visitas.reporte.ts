@@ -1,4 +1,4 @@
-import type { EstadoVisita } from '@prisma/client'
+import type { EstadoVisita, TipoRegistroHallazgo } from '@prisma/client'
 
 /** Datos que consume el reporte (desde visitasRepository.reporteData). */
 export interface ReporteData {
@@ -10,12 +10,15 @@ export interface ReporteData {
   estado: EstadoVisita
   resumenFinal: string | null
   hallazgos: Array<{
+    tipoRegistro: TipoRegistroHallazgo
     loteUnidad: { descripcion: string }
-    tipoHallazgo: { nombre: string }
+    tipoHallazgo: { nombre: string } | null
     comentario: string | null
     fotos: Array<{ mimetype: string; data: { datos: Uint8Array } | null }>
   }>
 }
+
+type ReporteHallazgo = ReporteData['hallazgos'][number]
 
 function esc(s: string): string {
   return s
@@ -41,10 +44,13 @@ export function construirHtmlReporte(v: ReporteData): string {
   for (const h of v.hallazgos) lotesSet.add(h.loteUnidad.descripcion)
   const lotes = [...lotesSet]
 
-  // Hallazgos agrupados por tipo.
-  const porTipo = new Map<string, ReporteData['hallazgos']>()
-  for (const h of v.hallazgos) {
-    const k = h.tipoHallazgo.nombre
+  // Separa por tipo de registro: HALLAZGO (agrupado por tipo de hallazgo) y NOTA_TECNICA.
+  const hallazgos = v.hallazgos.filter((h) => h.tipoRegistro === 'HALLAZGO')
+  const notas = v.hallazgos.filter((h) => h.tipoRegistro === 'NOTA_TECNICA')
+
+  const porTipo = new Map<string, ReporteHallazgo[]>()
+  for (const h of hallazgos) {
+    const k = h.tipoHallazgo?.nombre ?? 'Sin tipo'
     if (!porTipo.has(k)) porTipo.set(k, [])
     porTipo.get(k)!.push(h)
   }
@@ -53,27 +59,29 @@ export function construirHtmlReporte(v: ReporteData): string {
     ? `<ul class="lotes">${lotes.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
     : '<p class="muted">Sin lotes inspeccionados.</p>'
 
+  const filaDe = (h: ReporteHallazgo) => {
+    const fotos = h.fotos
+      .filter((f) => f.data)
+      .map(
+        (f) =>
+          `<img class="foto" src="data:${f.mimetype};base64,${Buffer.from(f.data!.datos).toString('base64')}" />`
+      )
+      .join('')
+    return `<div class="hallazgo">
+      <div class="h-head"><span class="unidad">${esc(h.loteUnidad.descripcion)}</span></div>
+      ${h.comentario ? `<p class="comentario">${esc(h.comentario)}</p>` : '<p class="muted">Sin comentario.</p>'}
+      ${fotos ? `<div class="fotos">${fotos}</div>` : ''}
+    </div>`
+  }
+
   const seccionHallazgos = [...porTipo.entries()]
-    .map(([tipo, items]) => {
-      const filas = items
-        .map((h) => {
-          const fotos = h.fotos
-            .filter((f) => f.data)
-            .map(
-              (f) =>
-                `<img class="foto" src="data:${f.mimetype};base64,${Buffer.from(f.data!.datos).toString('base64')}" />`
-            )
-            .join('')
-          return `<div class="hallazgo">
-            <div class="h-head"><span class="unidad">${esc(h.loteUnidad.descripcion)}</span></div>
-            ${h.comentario ? `<p class="comentario">${esc(h.comentario)}</p>` : '<p class="muted">Sin comentario.</p>'}
-            ${fotos ? `<div class="fotos">${fotos}</div>` : ''}
-          </div>`
-        })
-        .join('')
-      return `<div class="grupo"><h3>${esc(tipo)} <span class="count">(${items.length})</span></h3>${filas}</div>`
-    })
+    .map(
+      ([tipo, items]) =>
+        `<div class="grupo"><h3>${esc(tipo)} <span class="count">(${items.length})</span></h3>${items.map(filaDe).join('')}</div>`
+    )
     .join('')
+
+  const seccionNotas = notas.map(filaDe).join('')
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8" />
 <style>
@@ -112,6 +120,9 @@ export function construirHtmlReporte(v: ReporteData): string {
 
   <h2>Hallazgos por tipo</h2>
   ${seccionHallazgos || '<p class="muted">Sin hallazgos.</p>'}
+
+  <h2>Notas técnicas</h2>
+  ${seccionNotas || '<p class="muted">Sin notas técnicas.</p>'}
 
   <h2>Resumen final</h2>
   <div class="resumen">${v.resumenFinal ? esc(v.resumenFinal) : '<span class="muted">Sin resumen.</span>'}</div>
