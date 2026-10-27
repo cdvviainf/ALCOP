@@ -119,7 +119,9 @@ export default function ProgramacionPrevencionPage() {
     queryFn: () => api.get('nucleo/obras', { searchParams: { limit: '100' } }).json<{ data: Obra[] }>(),
   })
   const obras = obrasResp?.data ?? []
-  const obraActiva = obraId ?? obras[0]?.id ?? null
+  // La obra debe elegirse explícitamente: sin selección no hay calendario ni se
+  // puede agendar (no se auto-selecciona la primera obra).
+  const obraActiva = obraId
 
   const { data: diasResp, isLoading } = useQuery({
     queryKey: ['programacion', obraActiva, anio, mes],
@@ -236,13 +238,22 @@ export default function ProgramacionPrevencionPage() {
                         {c.dia}
                       </span>
                       {n > 0 ? (
-                        <span
-                          className={cn(
-                            'mt-auto inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                            esPasado ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
-                          )}
-                        >
-                          {n} formulario{n === 1 ? '' : 's'}
+                        <span className="mt-auto flex flex-col items-start gap-0.5">
+                          {dia!.formularios.slice(0, 3).map((f) => (
+                            <span
+                              key={f.id}
+                              title={f.formulario.nombre}
+                              className={cn(
+                                'inline-flex max-w-full items-center truncate rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                esPasado ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
+                              )}
+                            >
+                              {f.formulario.codigo}
+                            </span>
+                          ))}
+                          {n > 3 ? (
+                            <span className="px-1 text-[10px] font-medium text-muted-foreground">+{n - 3} más</span>
+                          ) : null}
                         </span>
                       ) : null}
                     </button>
