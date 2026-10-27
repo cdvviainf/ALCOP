@@ -9,6 +9,7 @@ import {
   Blocks,
   Boxes,
   Building2,
+  CalendarDays,
   ChevronRight,
   ClipboardCheck,
   Database,
@@ -104,6 +105,7 @@ const NAV: Seccion[] = [
     items: [
       { title: 'Visita Técnica', href: '/registro/inspeccion-tecnica', icon: HardHat, requiere: ['TEC_INSPECCION'] },
       { title: 'Visita Prevención', href: '/registro/inspeccion-prevencion', icon: ShieldCheck, requiere: ['PREV_INSPECCION'] },
+      { title: 'Programación Prev.', href: '/prevencion/programacion', icon: CalendarDays, requiere: ['PREV_PROGRAMACION'] },
     ],
   },
   {

@@ -110,6 +110,9 @@ await app.register(import('./modules/prevencion/visitas/visitas.routes.js'), { p
 await app.register(import('./modules/prevencion/niveles-riesgo/niveles-riesgo.routes.js'), {
   prefix: '/api/prevencion',
 })
+await app.register(import('./modules/prevencion/programacion/programacion.routes.js'), {
+  prefix: '/api/prevencion',
+})
 await app.register(import('./modules/tecnica/tipos-hallazgo/tipos-hallazgo.routes.js'), {
   prefix: '/api/tecnica',
 })

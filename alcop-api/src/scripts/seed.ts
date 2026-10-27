@@ -37,6 +37,7 @@ const FUNCIONES: Array<{ codigo: string; nombre: string; area: FuncionArea; orde
   { codigo: 'PREV_REPORTES', nombre: 'Reportes', area: FuncionArea.PREVENCION, orden: 4 },
   { codigo: 'PREV_CAT_CATEGORIAS', nombre: 'Categorías', area: FuncionArea.PREVENCION, orden: 5 },
   { codigo: 'PREV_CAT_NIVEL_RIESGO', nombre: 'Nivel de Riesgo', area: FuncionArea.PREVENCION, orden: 6 },
+  { codigo: 'PREV_PROGRAMACION', nombre: 'Programación', area: FuncionArea.PREVENCION, orden: 7 },
   { codigo: 'TEC_INSPECCION', nombre: 'Inspección Técnica', area: FuncionArea.TECNICA, orden: 1 },
   { codigo: 'TEC_FORMULARIOS', nombre: 'Formularios', area: FuncionArea.TECNICA, orden: 2 },
   { codigo: 'TEC_ANALISIS_IA', nombre: 'Análisis IA', area: FuncionArea.TECNICA, orden: 3 },
@@ -365,7 +366,7 @@ async function main() {
     console.warn('⚠️  Seed de admin falló (no bloquea el arranque):', (err as Error).message)
   }
   console.log(
-    '✅ Seed completado: 2 Areas, 17 Funciones, 6 Perfiles, 11 Categorías, 4 Niveles de riesgo, ' +
+    '✅ Seed completado: 2 Areas, 18 Funciones, 6 Perfiles, 11 Categorías, 4 Niveles de riesgo, ' +
       '3 Tipos de hallazgo, 5 Etapas constructivas, 6 Etapas de nido, 3 Formularios, 4 Obras.'
   )
 }

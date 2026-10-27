@@ -219,6 +219,7 @@ alcop-web/
 | `nucleo-compartido.md` | Pendiente de spec | Obra, PanelResumen |
 | `lotes-procedimientos.md` | **Cerrado (v0.1, 12-10-2026)** | TipoLote, Procedimiento (PDF), TipoLoteProcedimiento, ProcedimientoFormulario, ObraLote; cadena Obra→Lotes→Procedimientos→Formularios + derivación de formularios aplicables |
 | `prevencion.md` | **v0.1 (22-10-2026)** — Ola 1 (clasificación Categoría › Subcategoría) + Ola 2 (Visitas de Prevención) cerradas; AnalisisIA pendiente | SubcategoriaFormulario, VisitaPrevencion, HallazgoPrevencion; (pend.) AnalisisIA |
+| `programacion-prevencion.md` | **v0.1 (27-10-2026)** — Ola 1 (calendario de agendamiento por obra) implementada; cumplimiento/alertas diferidos | ProgramacionPrevencion, FormularioProgramado; función `PREV_PROGRAMACION` |
 | `tecnica.md` | Pendiente de spec | VisitaTecnica, HitoEtapa (nidos/puntales), AnalisisIA |
 | `reportes.md` | Pendiente de spec | Reporte (PDF generado), vínculo a Formulario/Visita/Hallazgo/AnalisisIA |
 | `alertas.md` | Pendiente de spec | Notificación por obra (Administrador, Jefe de Terreno, Prevencionista) |

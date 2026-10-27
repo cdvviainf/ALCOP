@@ -104,35 +104,36 @@ enum TipoRespuesta {
 }
 
 model Area {
-  id          Int      @id @default(autoincrement())
-  codigo      String   @unique // "PREVENCION" | "TECNICA"
+  id          Int                   @id @default(autoincrement())
+  codigo      String                @unique // "PREVENCION" | "TECNICA"
   nombre      String
   categorias  CategoriaFormulario[]
   formularios Formulario[]
 }
 
 model Usuario {
-  id          String   @id @default(cuid()) // String — referencia Better Auth
+  id                       String                   @id @default(cuid()) // String — referencia Better Auth
   // Enlace 1:1 con la identidad de Better Auth (auth_user.id). Nullable: un
   // Usuario puede existir sin credencial todavía; sin authUserId no autentica.
   // Columna + @unique (sin navegación de relación: el guard hace findFirst).
-  authUserId  String?  @unique
-  nombre      String
-  email       String   @unique
-  activo      Boolean  @default(true)
+  authUserId               String?                  @unique
+  nombre                   String
+  email                    String                   @unique
+  activo                   Boolean                  @default(true)
   // Administrador transversal (acceso TOTAL a todo; el perfil se ignora).
-  esAdmin     Boolean  @default(false)
-  perfilId    Int?
-  perfil      Perfil?  @relation(fields: [perfilId], references: [id])
-  obras       UsuarioObra[]
-  titularidades ObraTitular[]
-  respuestas  RespuestaFormulario[]
-  permisos    FormularioPermiso[]
-  visitas     VisitaTecnica[]
-  visitasPrevencion VisitaPrevencion[]
-  creadoEn    DateTime @default(now())
-  creadoPor   String?
-  eliminadoEn DateTime?
+  esAdmin                  Boolean                  @default(false)
+  perfilId                 Int?
+  perfil                   Perfil?                  @relation(fields: [perfilId], references: [id])
+  obras                    UsuarioObra[]
+  titularidades            ObraTitular[]
+  respuestas               RespuestaFormulario[]
+  permisos                 FormularioPermiso[]
+  visitas                  VisitaTecnica[]
+  visitasPrevencion        VisitaPrevencion[]
+  programacionesPrevencion ProgramacionPrevencion[]
+  creadoEn                 DateTime                 @default(now())
+  creadoPor                String?
+  eliminadoEn              DateTime?
 }
 
 // Modelo de accesos granular (Docs/usuarios-perfiles.md §4/§6, v2 07-10-2026).
@@ -216,29 +217,30 @@ model ObraTitular {
 
 // Obra — raíz del sistema. Modelo definitivo según Docs/nucleo-compartido.md §4.
 model Obra {
-  id                   Int        @id @default(autoincrement())
-  codigo               String     @unique // identificador interno, obligatorio y único
-  nombre               String
-  mandante             String?
-  direccion            String?
-  comuna               String?
-  fechaInicio          DateTime?
-  fechaTerminoEstimada DateTime?
-  estado               EstadoObra @default(SIN_INICIAR)
-  usuarios             UsuarioObra[]
-  titulares            ObraTitular[]
-  lotes                ObraLote[]
-  loteUnidades         LoteUnidad[]
-  visitas              VisitaTecnica[]
-  visitasPrevencion    VisitaPrevencion[]
-  respuestas           RespuestaFormulario[]
+  id                       Int                      @id @default(autoincrement())
+  codigo                   String                   @unique // identificador interno, obligatorio y único
+  nombre                   String
+  mandante                 String?
+  direccion                String?
+  comuna                   String?
+  fechaInicio              DateTime?
+  fechaTerminoEstimada     DateTime?
+  estado                   EstadoObra               @default(SIN_INICIAR)
+  usuarios                 UsuarioObra[]
+  titulares                ObraTitular[]
+  lotes                    ObraLote[]
+  loteUnidades             LoteUnidad[]
+  visitas                  VisitaTecnica[]
+  visitasPrevencion        VisitaPrevencion[]
+  programacionesPrevencion ProgramacionPrevencion[]
+  respuestas               RespuestaFormulario[]
   // Auditoría completa (nucleo-compartido.md §6 — convención canónica).
-  creadoEn             DateTime   @default(now())
-  creadoPor            String?
-  actualizadoEn        DateTime?  @updatedAt
-  actualizadoPor       String?
-  eliminadoEn          DateTime?
-  eliminadoPor         String?
+  creadoEn                 DateTime                 @default(now())
+  creadoPor                String?
+  actualizadoEn            DateTime?                @updatedAt
+  actualizadoPor           String?
+  eliminadoEn              DateTime?
+  eliminadoPor             String?
 }
 
 // ─── Catálogos por Área ───────────────────────────────────────────────────
@@ -249,13 +251,13 @@ model Obra {
 // Catálogo de Prevención: severidad de un hallazgo (Alto, Medio, Observación,
 // No conformidad). Referenciado a futuro por Hallazgo (módulo prevencion.md).
 model NivelRiesgo {
-  id           Int       @id @default(autoincrement())
-  codigo       String    @unique
+  id           Int                  @id @default(autoincrement())
+  codigo       String               @unique
   nombre       String
-  orden        Int       @default(0)
-  activo       Boolean   @default(true)
+  orden        Int                  @default(0)
+  activo       Boolean              @default(true)
   hallazgos    HallazgoPrevencion[]
-  creadoEn     DateTime  @default(now())
+  creadoEn     DateTime             @default(now())
   creadoPor    String?
   eliminadoEn  DateTime?
   eliminadoPor String?
@@ -264,13 +266,13 @@ model NivelRiesgo {
 // Catálogo de Técnica: tipo de hallazgo técnico (No conformidad, Mejora,
 // Sugerencia). Tabla separada de EtapaConstructiva (decisión 06-10-2026).
 model TipoHallazgoTecnico {
-  id           Int       @id @default(autoincrement())
-  codigo       String    @unique
+  id           Int               @id @default(autoincrement())
+  codigo       String            @unique
   nombre       String
-  orden        Int       @default(0)
-  activo       Boolean   @default(true)
+  orden        Int               @default(0)
+  activo       Boolean           @default(true)
   hallazgos    HallazgoTecnico[]
-  creadoEn     DateTime  @default(now())
+  creadoEn     DateTime          @default(now())
   creadoPor    String?
   eliminadoEn  DateTime?
   eliminadoPor String?
@@ -305,95 +307,96 @@ model EtapaNido {
 }
 
 model CategoriaFormulario {
-  id           Int          @id @default(autoincrement())
-  areaId       Int
-  area         Area         @relation(fields: [areaId], references: [id])
-  codigo       String // slug del nombre, único por área (validado en la app)
-  nombre       String
+  id                  Int                      @id @default(autoincrement())
+  areaId              Int
+  area                Area                     @relation(fields: [areaId], references: [id])
+  codigo              String // slug del nombre, único por área (validado en la app)
+  nombre              String
   // Campos de mantenedor (ampliación del spec formularios-dinamicos.md §4,
   // 06-10-2026): estado + soft delete + auditoría, aditivos con default.
-  activo        Boolean      @default(true)
-  formularios   Formulario[]
-  subcategorias SubcategoriaFormulario[]
+  activo              Boolean                  @default(true)
+  formularios         Formulario[]
+  subcategorias       SubcategoriaFormulario[]
   hallazgosPrevencion HallazgoPrevencion[]
-  creadoEn      DateTime     @default(now())
-  creadoPor     String?
-  eliminadoEn   DateTime?
-  eliminadoPor  String?
+  creadoEn            DateTime                 @default(now())
+  creadoPor           String?
+  eliminadoEn         DateTime?
+  eliminadoPor        String?
 }
 
 // Nivel anidado bajo CategoriaFormulario (22-10-2026). En Prevención clasifica
 // los hallazgos de visita (categoría › subcategoría). Mismos campos que la
 // categoría; hereda el Área vía la categoría padre.
 model SubcategoriaFormulario {
-  id             Int                 @id @default(autoincrement())
+  id             Int                  @id @default(autoincrement())
   categoriaId    Int
-  categoria      CategoriaFormulario @relation(fields: [categoriaId], references: [id])
+  categoria      CategoriaFormulario  @relation(fields: [categoriaId], references: [id])
   codigo         String // slug del nombre, único por categoría (índice parcial WHERE eliminadoEn IS NULL)
   nombre         String
-  activo         Boolean             @default(true)
+  activo         Boolean              @default(true)
   hallazgos      HallazgoPrevencion[]
-  creadoEn       DateTime            @default(now())
+  creadoEn       DateTime             @default(now())
   creadoPor      String?
-  actualizadoEn  DateTime?           @updatedAt
+  actualizadoEn  DateTime?            @updatedAt
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
 }
 
 model Formulario {
-  id           Int      @id @default(autoincrement())
-  codigo       String   @unique
-  nombre       String
-  areaId       Int
-  area         Area     @relation(fields: [areaId], references: [id])
-  categoriaId  Int
-  categoria    CategoriaFormulario @relation(fields: [categoriaId], references: [id])
-  requiereObra Boolean  @default(true)
-  activo       Boolean  @default(true)
-  preguntas    Pregunta[]
-  permisos     FormularioPermiso[]
+  id             Int                       @id @default(autoincrement())
+  codigo         String                    @unique
+  nombre         String
+  areaId         Int
+  area           Area                      @relation(fields: [areaId], references: [id])
+  categoriaId    Int
+  categoria      CategoriaFormulario       @relation(fields: [categoriaId], references: [id])
+  requiereObra   Boolean                   @default(true)
+  activo         Boolean                   @default(true)
+  preguntas      Pregunta[]
+  permisos       FormularioPermiso[]
   procedimientos ProcedimientoFormulario[]
-  respuestas   RespuestaFormulario[]
-  creadoEn     DateTime @default(now())
-  creadoPor    String
-  eliminadoEn  DateTime?
+  respuestas     RespuestaFormulario[]
+  programaciones FormularioProgramado[]
+  creadoEn       DateTime                  @default(now())
+  creadoPor      String
+  eliminadoEn    DateTime?
 }
 
 model Pregunta {
-  id              Int      @id @default(autoincrement())
+  id              Int                 @id @default(autoincrement())
   formularioId    Int
-  formulario      Formulario @relation(fields: [formularioId], references: [id])
+  formulario      Formulario          @relation(fields: [formularioId], references: [id])
   orden           Int
   texto           String
   tipoRespuesta   TipoRespuesta
-  obligatoria     Boolean  @default(true)
-  permiteFoto     Boolean  @default(false)
+  obligatoria     Boolean             @default(true)
+  permiteFoto     Boolean             @default(false)
   // Si permiteFoto, la foto puede además ser obligatoria al responder.
-  fotoObligatoria Boolean  @default(false)
+  fotoObligatoria Boolean             @default(false)
   opciones        String[]
   respuestas      RespuestaPregunta[]
 }
 
 model RespuestaFormulario {
-  id           Int      @id @default(autoincrement())
+  id           Int                 @id @default(autoincrement())
   formularioId Int
-  formulario   Formulario @relation(fields: [formularioId], references: [id])
+  formulario   Formulario          @relation(fields: [formularioId], references: [id])
   obraId       Int
-  obra         Obra     @relation(fields: [obraId], references: [id])
+  obra         Obra                @relation(fields: [obraId], references: [id])
   usuarioId    String
-  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
-  fechaHora    DateTime @default(now())
+  usuario      Usuario             @relation(fields: [usuarioId], references: [id])
+  fechaHora    DateTime            @default(now())
   respuestas   RespuestaPregunta[]
-  creadoEn     DateTime @default(now())
+  creadoEn     DateTime            @default(now())
 }
 
 model RespuestaPregunta {
-  id                     Int      @id @default(autoincrement())
+  id                     Int                 @id @default(autoincrement())
   respuestaFormularioId  Int
   respuestaFormulario    RespuestaFormulario @relation(fields: [respuestaFormularioId], references: [id])
   preguntaId             Int
-  pregunta               Pregunta @relation(fields: [preguntaId], references: [id])
+  pregunta               Pregunta            @relation(fields: [preguntaId], references: [id])
   valorTexto             String?
   valorNumero            Decimal?
   valorCheckbox          String?
@@ -402,13 +405,13 @@ model RespuestaPregunta {
 }
 
 model FormularioPermiso {
-  id           Int      @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   formularioId Int
   formulario   Formulario @relation(fields: [formularioId], references: [id])
   usuarioId    String
-  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
-  puedeVer     Boolean  @default(true)
-  puedeEditar  Boolean  @default(false)
+  usuario      Usuario    @relation(fields: [usuarioId], references: [id])
+  puedeVer     Boolean    @default(true)
+  puedeEditar  Boolean    @default(false)
 
   @@unique([formularioId, usuarioId])
 }
@@ -418,17 +421,17 @@ model FormularioPermiso {
 
 // Maestro de tipos de lote (Casa, Departamento, Bodega, Portería, …). Dinámico.
 model TipoLote {
-  id             Int       @id @default(autoincrement())
-  codigo         String    @unique // slug del nombre, único (validado en la app)
+  id             Int                     @id @default(autoincrement())
+  codigo         String                  @unique // slug del nombre, único (validado en la app)
   nombre         String
-  orden          Int       @default(0)
-  activo         Boolean   @default(true)
+  orden          Int                     @default(0)
+  activo         Boolean                 @default(true)
   procedimientos TipoLoteProcedimiento[]
   obras          ObraLote[]
   unidades       LoteUnidad[]
-  creadoEn       DateTime  @default(now())
+  creadoEn       DateTime                @default(now())
   creadoPor      String?
-  actualizadoEn  DateTime? @updatedAt
+  actualizadoEn  DateTime?               @updatedAt
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
@@ -437,18 +440,18 @@ model TipoLote {
 // Maestro de procedimientos constructivos (PDF normativo). Apunta a formularios
 // de control y es referenciado por tipos de lote.
 model Procedimiento {
-  id             Int       @id @default(autoincrement())
-  codigo         String    @unique // identificador del procedimiento, obligatorio y único
+  id             Int                       @id @default(autoincrement())
+  codigo         String                    @unique // identificador del procedimiento, obligatorio y único
   nombre         String
-  vigenciaDesde  DateTime            // fecha desde la que rige el documento
-  vigenciaHasta  DateTime?           // null = vigente indefinido
-  activo         Boolean   @default(true)
+  vigenciaDesde  DateTime // fecha desde la que rige el documento
+  vigenciaHasta  DateTime? // null = vigente indefinido
+  activo         Boolean                   @default(true)
   archivo        ProcedimientoArchivo? // PDF adjunto (bytes en BD — ver modelo abajo)
   tiposLote      TipoLoteProcedimiento[]
   formularios    ProcedimientoFormulario[]
-  creadoEn       DateTime  @default(now())
+  creadoEn       DateTime                  @default(now())
   creadoPor      String?
-  actualizadoEn  DateTime? @updatedAt
+  actualizadoEn  DateTime?                 @updatedAt
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
@@ -461,7 +464,7 @@ model ProcedimientoArchivo {
   id              Int           @id @default(autoincrement())
   procedimientoId Int           @unique
   procedimiento   Procedimiento @relation(fields: [procedimientoId], references: [id])
-  datos           Bytes         // contenido del PDF
+  datos           Bytes // contenido del PDF
   actualizadoEn   DateTime      @updatedAt
 }
 
@@ -498,7 +501,7 @@ model ObraLote {
   obra           Obra      @relation(fields: [obraId], references: [id])
   tipoLoteId     Int
   tipoLote       TipoLote  @relation(fields: [tipoLoteId], references: [id])
-  cantidad       Int                 // >= 1
+  cantidad       Int // >= 1
   creadoEn       DateTime  @default(now())
   creadoPor      String?
   actualizadoEn  DateTime? @updatedAt
@@ -532,70 +535,70 @@ enum TipoRegistroHallazgo {
 
 // Unidad individual de lote, autogenerada desde ObraLote (ej. "Casa 001").
 model LoteUnidad {
-  id          Int       @id @default(autoincrement())
+  id          Int               @id @default(autoincrement())
   obraId      Int
-  obra        Obra      @relation(fields: [obraId], references: [id])
+  obra        Obra              @relation(fields: [obraId], references: [id])
   tipoLoteId  Int
-  tipoLote    TipoLote  @relation(fields: [tipoLoteId], references: [id])
+  tipoLote    TipoLote          @relation(fields: [tipoLoteId], references: [id])
   correlativo Int
   descripcion String
   hallazgos   HallazgoTecnico[]
-  creadoEn    DateTime  @default(now())
+  creadoEn    DateTime          @default(now())
   eliminadoEn DateTime?
 
   @@unique([obraId, tipoLoteId, correlativo])
 }
 
 model VisitaTecnica {
-  id             Int          @id @default(autoincrement())
+  id             Int               @id @default(autoincrement())
   obraId         Int
-  obra           Obra         @relation(fields: [obraId], references: [id])
+  obra           Obra              @relation(fields: [obraId], references: [id])
   usuarioId      String
-  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
+  usuario        Usuario           @relation(fields: [usuarioId], references: [id])
   fecha          DateTime
   horaInicio     String?
   horaTermino    String?
-  estado         EstadoVisita @default(EN_CURSO)
+  estado         EstadoVisita      @default(EN_CURSO)
   resumenFinal   String?
   hallazgos      HallazgoTecnico[]
-  creadoEn       DateTime     @default(now())
+  creadoEn       DateTime          @default(now())
   creadoPor      String?
-  actualizadoEn  DateTime?    @updatedAt
+  actualizadoEn  DateTime?         @updatedAt
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
 }
 
 model HallazgoTecnico {
-  id             Int                 @id @default(autoincrement())
+  id             Int                  @id @default(autoincrement())
   visitaId       Int
-  visita         VisitaTecnica       @relation(fields: [visitaId], references: [id])
+  visita         VisitaTecnica        @relation(fields: [visitaId], references: [id])
   loteUnidadId   Int
-  loteUnidad     LoteUnidad          @relation(fields: [loteUnidadId], references: [id])
+  loteUnidad     LoteUnidad           @relation(fields: [loteUnidadId], references: [id])
   // tipoRegistro clasifica la entrada; tipoHallazgo (catálogo) solo aplica a HALLAZGO.
   tipoRegistro   TipoRegistroHallazgo @default(HALLAZGO)
   tipoHallazgoId Int?
   tipoHallazgo   TipoHallazgoTecnico? @relation(fields: [tipoHallazgoId], references: [id])
   comentario     String?
-  orden          Int                 @default(0)
+  orden          Int                  @default(0)
   fotos          HallazgoFoto[]
-  creadoEn       DateTime            @default(now())
+  creadoEn       DateTime             @default(now())
   eliminadoEn    DateTime?
 }
 
 // Metadata de la foto (sin el binario → no se arrastra en listados).
 model HallazgoFoto {
-  id          Int             @id @default(autoincrement())
-  hallazgoId  Int
-  hallazgo    HallazgoTecnico @relation(fields: [hallazgoId], references: [id])
-  mimetype    String
-  calidad     CalidadImagen
-  tamano      Int
-  ancho       Int?
-  alto        Int?
-  orden       Int             @default(0)
-  data        HallazgoFotoData?
-  creadoEn    DateTime        @default(now())
+  id         Int               @id @default(autoincrement())
+  hallazgoId Int
+  hallazgo   HallazgoTecnico   @relation(fields: [hallazgoId], references: [id])
+  mimetype   String
+  calidad    CalidadImagen
+  tamano     Int
+  ancho      Int?
+  alto       Int?
+  orden      Int               @default(0)
+  data       HallazgoFotoData?
+  creadoEn   DateTime          @default(now())
 }
 
 // Binario de la foto EN LA BD (bytea), tabla separada (patrón PDF procedimientos).
@@ -617,44 +620,44 @@ enum PlazoUnidad {
 }
 
 model VisitaPrevencion {
-  id             Int          @id @default(autoincrement())
+  id             Int                  @id @default(autoincrement())
   obraId         Int
-  obra           Obra         @relation(fields: [obraId], references: [id])
+  obra           Obra                 @relation(fields: [obraId], references: [id])
   usuarioId      String
-  usuario        Usuario      @relation(fields: [usuarioId], references: [id])
+  usuario        Usuario              @relation(fields: [usuarioId], references: [id])
   fecha          DateTime
   horaInicio     String?
   horaTermino    String?
-  estado         EstadoVisita @default(EN_CURSO)
+  estado         EstadoVisita         @default(EN_CURSO)
   resumenFinal   String?
   hallazgos      HallazgoPrevencion[]
-  creadoEn       DateTime     @default(now())
+  creadoEn       DateTime             @default(now())
   creadoPor      String?
-  actualizadoEn  DateTime?    @updatedAt
+  actualizadoEn  DateTime?            @updatedAt
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
 }
 
 model HallazgoPrevencion {
-  id             Int                    @id @default(autoincrement())
+  id             Int                      @id @default(autoincrement())
   visitaId       Int
-  visita         VisitaPrevencion       @relation(fields: [visitaId], references: [id])
+  visita         VisitaPrevencion         @relation(fields: [visitaId], references: [id])
   categoriaId    Int
-  categoria      CategoriaFormulario    @relation(fields: [categoriaId], references: [id])
+  categoria      CategoriaFormulario      @relation(fields: [categoriaId], references: [id])
   subcategoriaId Int
-  subcategoria   SubcategoriaFormulario @relation(fields: [subcategoriaId], references: [id])
+  subcategoria   SubcategoriaFormulario   @relation(fields: [subcategoriaId], references: [id])
   nivelRiesgoId  Int
-  nivelRiesgo    NivelRiesgo            @relation(fields: [nivelRiesgoId], references: [id])
-  plazoValor     Int                    // tiempo estimado de solución (> 0)
+  nivelRiesgo    NivelRiesgo              @relation(fields: [nivelRiesgoId], references: [id])
+  plazoValor     Int // tiempo estimado de solución (> 0)
   plazoUnidad    PlazoUnidad
-  comentario     String                 // obligatorio
-  orden          Int                    @default(0)
+  comentario     String // obligatorio
+  orden          Int                      @default(0)
   fotos          HallazgoPrevencionFoto[]
   // Auditoría completa (nucleo-compartido.md §6 — tabla nueva, QA-OKA-019).
-  creadoEn       DateTime               @default(now())
+  creadoEn       DateTime                 @default(now())
   creadoPor      String?
-  actualizadoEn  DateTime?              @updatedAt
+  actualizadoEn  DateTime?                @updatedAt
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
@@ -662,17 +665,17 @@ model HallazgoPrevencion {
 
 // Metadata de la foto (sin el binario → no se arrastra en listados).
 model HallazgoPrevencionFoto {
-  id         Int                 @id @default(autoincrement())
+  id         Int                         @id @default(autoincrement())
   hallazgoId Int
-  hallazgo   HallazgoPrevencion  @relation(fields: [hallazgoId], references: [id])
+  hallazgo   HallazgoPrevencion          @relation(fields: [hallazgoId], references: [id])
   mimetype   String
   calidad    CalidadImagen
   tamano     Int
   ancho      Int?
   alto       Int?
-  orden      Int                 @default(0)
+  orden      Int                         @default(0)
   data       HallazgoPrevencionFotoData?
-  creadoEn   DateTime            @default(now())
+  creadoEn   DateTime                    @default(now())
 }
 
 // Binario de la foto EN LA BD (bytea), tabla separada (patrón de técnica).
@@ -681,6 +684,48 @@ model HallazgoPrevencionFotoData {
   fotoId Int                    @unique
   foto   HallazgoPrevencionFoto @relation(fields: [fotoId], references: [id])
   datos  Bytes
+}
+
+// ─── Programación de Prevención (Docs/programacion-prevencion.md) ────────────
+// Calendario de agendamiento por obra: cada día (obra, fecha) agrupa uno o más
+// formularios de Prevención a aplicar + un comentario, a cargo del prevencionista
+// titular de la obra (snapshot). El calendario ES el mecanismo de aplicación de
+// formularios a una obra (no se deriva de la cadena lotes→procedimientos).
+// Unicidad entre vivos: (obraId, fecha) y (programacionId, formularioId) → índices
+// únicos PARCIALES (WHERE "eliminadoEn" IS NULL) creados en la migración.
+// NOTA: el cumplimiento (estado/respuesta) llega con el motor de respuestas
+// (diferido); hoy esto es solo planificación — ver spec §10.
+
+model ProgramacionPrevencion {
+  id             Int                    @id @default(autoincrement())
+  obraId         Int
+  obra           Obra                   @relation(fields: [obraId], references: [id])
+  fecha          DateTime               @db.Date
+  comentario     String?
+  // Snapshot del titular PREVENCIONISTA de la obra al crear (null si la obra no
+  // tiene titular). Para notificación/historial; no se reasigna automáticamente.
+  usuarioId      String?
+  usuario        Usuario?               @relation(fields: [usuarioId], references: [id])
+  formularios    FormularioProgramado[]
+  creadoEn       DateTime               @default(now())
+  creadoPor      String?
+  actualizadoEn  DateTime?              @updatedAt
+  actualizadoPor String?
+  eliminadoEn    DateTime?
+  eliminadoPor   String?
+}
+
+model FormularioProgramado {
+  id             Int                    @id @default(autoincrement())
+  programacionId Int
+  programacion   ProgramacionPrevencion @relation(fields: [programacionId], references: [id])
+  formularioId   Int
+  formulario     Formulario             @relation(fields: [formularioId], references: [id])
+  orden          Int                    @default(0)
+  creadoEn       DateTime               @default(now())
+  creadoPor      String?
+  eliminadoEn    DateTime?
+  eliminadoPor   String?
 }
 
 // Configuración del sistema (clave/valor). 1er uso: calidad de imagen por defecto.
