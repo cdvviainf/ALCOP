@@ -10,6 +10,7 @@ import {
   Boxes,
   Building2,
   CalendarDays,
+  ClipboardList,
   ChevronRight,
   ClipboardCheck,
   Database,
@@ -105,7 +106,7 @@ const NAV: Seccion[] = [
     items: [
       { title: 'Visita Técnica', href: '/registro/inspeccion-tecnica', icon: HardHat, requiere: ['TEC_INSPECCION'] },
       { title: 'Visita Prevención', href: '/registro/inspeccion-prevencion', icon: ShieldCheck, requiere: ['PREV_INSPECCION'] },
-      { title: 'Programación Prev.', href: '/prevencion/programacion', icon: CalendarDays, requiere: ['PREV_PROGRAMACION'] },
+      { title: 'Registro Prevención', href: '/registro/prevencion', icon: ClipboardList, requiere: ['PREV_REGISTROS'] },
     ],
   },
   {
@@ -114,6 +115,7 @@ const NAV: Seccion[] = [
       { title: 'Obras', href: '/obras', icon: Building2, requiere: ['OBRAS'] },
       { title: 'Procedimientos', href: '/configuracion/procedimientos', icon: ScrollText, requiere: ['PROCEDIMIENTOS'] },
       { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: ['PREV_FORMULARIOS', 'TEC_FORMULARIOS'] },
+      { title: 'Calendario', href: '/prevencion/programacion', icon: CalendarDays, requiere: ['PREV_PROGRAMACION'] },
       {
         title: 'Datos Maestros',
         icon: Database,

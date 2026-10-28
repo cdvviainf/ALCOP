@@ -152,6 +152,12 @@ export const programacionService = {
       if (!vivo) throw new NotFoundError('Programación', String(id))
       const linea = await programacionRepository.buscarLinea(fpId, id, tx)
       if (!linea) throw new NotFoundError('Formulario programado', String(fpId))
+      // Bloquea la MISMA fila que el cierre antes de comprobar el histórico: así la
+      // comprobación ve cualquier cierre concurrente ya confirmado (QA-RP-009).
+      await programacionRepository.lockFp(tx, fpId)
+      if (await programacionRepository.fpTieneRespuestaCerrada(fpId, tx)) {
+        throw new ConflictError('No se puede quitar: el formulario tiene un registro completado (histórico).')
+      }
       const { total } = await programacionRepository.lineasVivas(id, tx)
       if (total <= 1) {
         throw new ConflictError('No puedes quitar el último formulario del día; elimina el día en su lugar.')
@@ -163,7 +169,17 @@ export const programacionService = {
 
   async eliminarDia(id: number, eliminadoPor: string): Promise<void> {
     await this.exigirDiaEditable(id)
-    await prisma.$transaction((tx) => programacionRepository.softDeleteDia(id, eliminadoPor, tx))
+    await prisma.$transaction(async (tx) => {
+      const vivo = await programacionRepository.lockDia(tx, id)
+      if (!vivo) throw new NotFoundError('Programación', String(id))
+      // Bloquea TODOS los formularios del día (orden determinista) antes de comprobar
+      // el histórico, serializando con el cierre sobre la misma fila (QA-RP-009).
+      await programacionRepository.lockFpsDeDia(tx, id)
+      if (await programacionRepository.diaTieneRespuestaCerrada(id, tx)) {
+        throw new ConflictError('No se puede eliminar: el día tiene un registro completado (histórico).')
+      }
+      await programacionRepository.softDeleteDia(id, eliminadoPor, tx)
+    })
   },
 
   /** Carga el día y exige que su fecha no sea pasada (días pasados = solo lectura). */

@@ -378,30 +378,72 @@ model Pregunta {
   respuestas      RespuestaPregunta[]
 }
 
+// Estado de llenado de un registro (Docs/registros-prevencion.md). BORRADOR admite
+// guardado parcial; CERRADO exige todas las obligatorias (respuestas + fotos).
+enum EstadoRespuesta {
+  BORRADOR
+  CERRADO
+}
+
 model RespuestaFormulario {
-  id           Int                 @id @default(autoincrement())
-  formularioId Int
-  formulario   Formulario          @relation(fields: [formularioId], references: [id])
-  obraId       Int
-  obra         Obra                @relation(fields: [obraId], references: [id])
-  usuarioId    String
-  usuario      Usuario             @relation(fields: [usuarioId], references: [id])
-  fechaHora    DateTime            @default(now())
-  respuestas   RespuestaPregunta[]
-  creadoEn     DateTime            @default(now())
+  id                     Int                   @id @default(autoincrement())
+  formularioId           Int
+  formulario             Formulario            @relation(fields: [formularioId], references: [id])
+  obraId                 Int
+  obra                   Obra                  @relation(fields: [obraId], references: [id])
+  usuarioId              String
+  usuario                Usuario               @relation(fields: [usuarioId], references: [id])
+  // Origen del registro: el formulario agendado en el calendario (1:0..1).
+  formularioProgramadoId Int?                  @unique
+  formularioProgramado   FormularioProgramado? @relation(fields: [formularioProgramadoId], references: [id])
+  estado                 EstadoRespuesta       @default(BORRADOR)
+  // Fecha de revisión que el usuario informa al cerrar el registro.
+  fechaRevision          DateTime?
+  fechaHora              DateTime              @default(now())
+  respuestas             RespuestaPregunta[]
+  creadoEn               DateTime              @default(now())
+  creadoPor              String?
+  actualizadoEn          DateTime?             @updatedAt
+  actualizadoPor         String?
 }
 
 model RespuestaPregunta {
-  id                     Int                 @id @default(autoincrement())
+  id                     Int                     @id @default(autoincrement())
   respuestaFormularioId  Int
-  respuestaFormulario    RespuestaFormulario @relation(fields: [respuestaFormularioId], references: [id])
+  respuestaFormulario    RespuestaFormulario     @relation(fields: [respuestaFormularioId], references: [id])
   preguntaId             Int
-  pregunta               Pregunta            @relation(fields: [preguntaId], references: [id])
+  pregunta               Pregunta                @relation(fields: [preguntaId], references: [id])
   valorTexto             String?
   valorNumero            Decimal?
   valorCheckbox          String?
   valorSeleccionMultiple String[]
-  fotoUrl                String?
+  fotos                  RespuestaPreguntaFoto[]
+
+  @@unique([respuestaFormularioId, preguntaId])
+}
+
+// Foto de una respuesta (metadata, sin binario → no se arrastra en listados).
+// Patrón técnica/prevención: binario en tabla separada, SIEMPRE en la BD.
+model RespuestaPreguntaFoto {
+  id                  Int                        @id @default(autoincrement())
+  respuestaPreguntaId Int
+  respuestaPregunta   RespuestaPregunta          @relation(fields: [respuestaPreguntaId], references: [id])
+  mimetype            String
+  calidad             CalidadImagen
+  tamano              Int
+  ancho               Int?
+  alto                Int?
+  orden               Int                        @default(0)
+  data                RespuestaPreguntaFotoData?
+  creadoEn            DateTime                   @default(now())
+}
+
+// Binario de la foto EN LA BD (bytea), tabla separada.
+model RespuestaPreguntaFotoData {
+  id     Int                   @id @default(autoincrement())
+  fotoId Int                   @unique
+  foto   RespuestaPreguntaFoto @relation(fields: [fotoId], references: [id])
+  datos  Bytes
 }
 
 model FormularioPermiso {
@@ -713,6 +755,8 @@ model ProgramacionPrevencion {
   actualizadoPor String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
+
+  @@index([obraId])
 }
 
 model FormularioProgramado {
@@ -722,10 +766,14 @@ model FormularioProgramado {
   formularioId   Int
   formulario     Formulario             @relation(fields: [formularioId], references: [id])
   orden          Int                    @default(0)
+  // Registro de llenado originado por este agendamiento (1:0..1).
+  respuesta      RespuestaFormulario?
   creadoEn       DateTime               @default(now())
   creadoPor      String?
   eliminadoEn    DateTime?
   eliminadoPor   String?
+
+  @@index([programacionId])
 }
 
 // Configuración del sistema (clave/valor). 1er uso: calidad de imagen por defecto.

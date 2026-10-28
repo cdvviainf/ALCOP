@@ -136,6 +136,34 @@ export const programacionRepository = {
     return db.formularioProgramado.create({ data: { programacionId, formularioId, orden, creadoPor } })
   },
 
+  /** Bloquea un FormularioProgramado (FOR UPDATE) — serializa con el cierre (QA-RP-009). */
+  async lockFp(tx: Prisma.TransactionClient, fpId: number): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "FormularioProgramado" WHERE id = ${fpId} AND "eliminadoEn" IS NULL FOR UPDATE`
+  },
+
+  /** Bloquea TODOS los FormularioProgramado vivos del día, en orden determinista (QA-RP-009). */
+  async lockFpsDeDia(tx: Prisma.TransactionClient, programacionId: number): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "FormularioProgramado" WHERE "programacionId" = ${programacionId} AND "eliminadoEn" IS NULL ORDER BY id FOR UPDATE`
+  },
+
+  /** ¿El formulario programado tiene un registro CERRADO? (histórico, QA-RP-009). */
+  async fpTieneRespuestaCerrada(fpId: number, db: DbClient = prisma): Promise<boolean> {
+    const r = await db.respuestaFormulario.findFirst({
+      where: { formularioProgramadoId: fpId, estado: 'CERRADO' },
+      select: { id: true },
+    })
+    return r !== null
+  },
+
+  /** ¿Algún formulario vivo del día tiene un registro CERRADO? (QA-RP-009). */
+  async diaTieneRespuestaCerrada(programacionId: number, db: DbClient = prisma): Promise<boolean> {
+    const r = await db.respuestaFormulario.findFirst({
+      where: { estado: 'CERRADO', formularioProgramado: { programacionId, eliminadoEn: null } },
+      select: { id: true },
+    })
+    return r !== null
+  },
+
   async buscarLinea(fpId: number, programacionId: number, db: DbClient = prisma) {
     return db.formularioProgramado.findFirst({
       where: { id: fpId, programacionId, eliminadoEn: null },
