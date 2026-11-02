@@ -215,26 +215,34 @@ export default function RegistroDetallePage({ params }: { params: Promise<{ id: 
             </div>
           ) : null}
 
-          <div className="space-y-4">
-            {reg.preguntas.map((p, i) => {
-              const r = reg.respuestas.find((x) => x.preguntaId === p.id)
-              return (
-                <PreguntaCard
-                  key={p.id}
-                  index={i + 1}
-                  pregunta={p}
-                  valor={answers.get(p.id)}
-                  fotos={r?.fotos ?? []}
-                  editable={editable}
-                  registroId={fpId}
-                  onChange={(patch) => setVal(p.id, patch)}
-                  onFotoChange={() => void refetch()}
-                />
-              )
-            })}
-          </div>
+          {reg.preguntas.length === 0 ? (
+            <div className="rounded-lg border border-warn-bg bg-warn-bg/40 px-4 py-3 text-sm text-warn-fg">
+              Este formulario (<span className="font-medium">{reg.formulario.codigo}</span>) no tiene preguntas
+              configuradas, así que no hay nada que llenar. Agrega preguntas al formulario en Formularios y vuelve a
+              agendarlo, o agenda otro formulario que ya tenga preguntas.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reg.preguntas.map((p, i) => {
+                const r = reg.respuestas.find((x) => x.preguntaId === p.id)
+                return (
+                  <PreguntaCard
+                    key={p.id}
+                    index={i + 1}
+                    pregunta={p}
+                    valor={answers.get(p.id)}
+                    fotos={r?.fotos ?? []}
+                    editable={editable}
+                    registroId={fpId}
+                    onChange={(patch) => setVal(p.id, patch)}
+                    onFotoChange={() => void refetch()}
+                  />
+                )
+              })}
+            </div>
+          )}
 
-          {editable ? (
+          {editable && reg.preguntas.length > 0 ? (
             <div className="sticky bottom-4 flex items-center justify-end gap-2 rounded-xl border border-border bg-card/95 p-3 backdrop-blur">
               <Button variant="outline" disabled={guardar.isPending} onClick={() => guardar.mutate()}>
                 {guardar.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
