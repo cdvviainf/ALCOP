@@ -37,12 +37,11 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
       PGDATA: /var/lib/postgresql/data/pgdata
-    # Acceso a la BD para administración/reportería (pgAdmin, BI). Atado a
-    # 127.0.0.1 del host: NO queda expuesto a Internet, solo se llega por túnel
-    # SSH (`ssh -N -L 5434:localhost:5434 root@<host>`). Puerto 5434 para no
-    # chocar con ENE (5433) si comparten servidor.
+    # Acceso a la BD para administración/reportería (pgAdmin, BI), igual que ENE.
+    # OJO: expone la base de QA a Internet en el puerto 5434, protegida solo por
+    # DB_PASSWORD. Puerto 5434 para no chocar con ENE (5433) en el mismo servidor.
     ports:
-      - "127.0.0.1:5434:5432"
+      - "5434:5432"
     volumes:
       - alcop_qa_postgres_data:/var/lib/postgresql/data
     healthcheck:
