@@ -13,7 +13,7 @@ import {
 import { registrosService } from './registros.service.js'
 
 /** Extrae campos + el (único) archivo de un request multipart (foto de respuesta). */
-async function parseMultipart(
+export async function parseMultipart(
   request: FastifyRequest
 ): Promise<{ campos: Record<string, string>; archivo: { buffer: Buffer } | null }> {
   if (!request.isMultipart()) {

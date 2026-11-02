@@ -1,8 +1,11 @@
 import type { Prisma, TipoRespuesta } from '@prisma/client'
 
-/** Datos que consume el reporte (desde registrosRepository.reporteData). */
+/** Datos que consume el reporte (compartido por Registro Prevención y Técnico). */
 export interface ReporteData {
-  programacion: { fecha: Date; obra: { codigo: string; nombre: string } }
+  obra: { codigo: string; nombre: string }
+  fecha: Date
+  /** Etiqueta de la fecha: programada (Prevención) o de aplicación (Técnica). */
+  fechaLabel: string
   formulario: {
     codigo: string
     nombre: string
@@ -95,8 +98,8 @@ export function construirHtmlReporte(reg: ReporteData): string {
   <span class="badge">COMPLETADO</span>
   <table class="meta">
     <tr><td class="k">Formulario</td><td>${esc(reg.formulario.nombre)} · ${esc(reg.formulario.codigo)}</td></tr>
-    <tr><td class="k">Obra</td><td>${esc(reg.programacion.obra.nombre)} · ${esc(reg.programacion.obra.codigo)}</td></tr>
-    <tr><td class="k">Fecha programada</td><td>${fechaCorta(reg.programacion.fecha)}</td></tr>
+    <tr><td class="k">Obra</td><td>${esc(reg.obra.nombre)} · ${esc(reg.obra.codigo)}</td></tr>
+    <tr><td class="k">${esc(reg.fechaLabel)}</td><td>${fechaCorta(reg.fecha)}</td></tr>
     <tr><td class="k">Fecha de revisión</td><td>${reg.respuesta?.fechaRevision ? fechaCorta(reg.respuesta.fechaRevision) : '—'}</td></tr>
     <tr><td class="k">Completado por</td><td>${reg.respuesta ? esc(reg.respuesta.usuario.nombre) : '—'}</td></tr>
   </table>

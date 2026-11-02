@@ -126,6 +126,7 @@ await app.register(import('./modules/tecnica/etapas-nido/etapas-nido.routes.js')
   prefix: '/api/tecnica',
 })
 await app.register(import('./modules/tecnica/visitas/visitas.routes.js'), { prefix: '/api/tecnica' })
+await app.register(import('./modules/tecnica/registros/registros.routes.js'), { prefix: '/api/tecnica' })
 
 try {
   await app.listen({ port: env.PORT, host: '0.0.0.0' })

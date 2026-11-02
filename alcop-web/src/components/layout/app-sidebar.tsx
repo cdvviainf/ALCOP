@@ -107,6 +107,7 @@ const NAV: Seccion[] = [
       { title: 'Visita Técnica', href: '/registro/inspeccion-tecnica', icon: HardHat, requiere: ['TEC_INSPECCION'] },
       { title: 'Visita Prevención', href: '/registro/inspeccion-prevencion', icon: ShieldCheck, requiere: ['PREV_INSPECCION'] },
       { title: 'Registro Prevención', href: '/registro/prevencion', icon: ClipboardList, requiere: ['PREV_REGISTROS'] },
+      { title: 'Registro Técnico', href: '/registro/tecnica', icon: ClipboardList, requiere: ['TEC_REGISTROS'] },
     ],
   },
   {

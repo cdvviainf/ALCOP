@@ -1,4 +1,4 @@
-import { Prisma, type CalidadImagen, type TipoRespuesta } from '@prisma/client'
+import type { CalidadImagen } from '@prisma/client'
 import { env } from '../../../config/env.js'
 import { prisma } from '../../../lib/prisma.js'
 import { BusinessError, ConflictError, NotFoundError } from '../../../shared/errors.js'
@@ -6,10 +6,11 @@ import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
 import { esImagenValida, optimizarImagen } from '../../../shared/imagen.js'
 import { htmlToPdf } from '../../../shared/pdf.js'
+import { mapValores, tieneValor } from '../../../shared/respuestas-formulario.js'
 import { configuracionService } from '../../nucleo/configuracion/configuracion.service.js'
 import { construirHtmlReporte } from './registros.reporte.js'
 import { registrosRepository } from './registros.repository.js'
-import type { CerrarRegistroInput, GuardarRespuestasInput, RespuestaItemInput } from './registros.schema.js'
+import type { CerrarRegistroInput, GuardarRespuestasInput } from './registros.schema.js'
 import type {
   EstadoRegistro,
   RegistroDetalleDTO,
@@ -30,69 +31,11 @@ function diaAUtc(dia: string): Date {
   return new Date(`${dia}T00:00:00.000Z`)
 }
 
-// Valores canónicos del tipo CHECKBOX (formularios-dinamicos.md §4).
-const CHECKBOX_VALIDOS = ['CUMPLE', 'NO_CUMPLE', 'N_A']
-
 function estadoDe(fechaStr: string, cerrado: boolean, hoy: string): EstadoRegistro {
   if (cerrado) return 'COMPLETADO'
   if (fechaStr > hoy) return 'POR_APLICAR'
   if (fechaStr === hoy) return 'VIGENTE'
   return 'ATRASADO'
-}
-
-type ValorRow = {
-  valorTexto: string | null
-  valorNumero: Prisma.Decimal | null
-  valorCheckbox: string | null
-  valorSeleccionMultiple: string[]
-}
-
-/** ¿La respuesta satisface una pregunta obligatoria, según su tipo? */
-function tieneValor(tipo: TipoRespuesta, r: ValorRow | undefined): boolean {
-  if (!r) return false
-  switch (tipo) {
-    case 'CHECKBOX':
-      return !!r.valorCheckbox && r.valorCheckbox.trim().length > 0
-    case 'SELECCION_MULTIPLE':
-      return r.valorSeleccionMultiple.length > 0
-    case 'NUMERO':
-      return r.valorNumero !== null
-    case 'TEXTO':
-    case 'TEXTO_LARGO':
-      return !!r.valorTexto && r.valorTexto.trim().length > 0
-  }
-}
-
-/** Mapea el input al único campo de valor que corresponde al tipo de la pregunta. */
-function mapValores(
-  tipo: TipoRespuesta,
-  input: RespuestaItemInput,
-  opciones: string[]
-): { valorTexto: string | null; valorNumero: number | null; valorCheckbox: string | null; valorSeleccionMultiple: string[] } {
-  const base = { valorTexto: null as string | null, valorNumero: null as number | null, valorCheckbox: null as string | null, valorSeleccionMultiple: [] as string[] }
-  switch (tipo) {
-    case 'TEXTO':
-    case 'TEXTO_LARGO':
-      return { ...base, valorTexto: input.valorTexto?.trim() || null }
-    case 'NUMERO':
-      return { ...base, valorNumero: input.valorNumero ?? null }
-    case 'CHECKBOX': {
-      // CHECKBOX = Cumple / No cumple / N.A. (formularios-dinamicos.md §4/§6), NO booleano.
-      const val = input.valorCheckbox?.trim() || null
-      if (val !== null && !CHECKBOX_VALIDOS.includes(val)) {
-        throw new BusinessError('VALOR_INVALIDO', 'El valor del checkbox debe ser CUMPLE, NO_CUMPLE o N_A.', 422)
-      }
-      return { ...base, valorCheckbox: val }
-    }
-    case 'SELECCION_MULTIPLE': {
-      const sel = input.valorSeleccionMultiple ?? []
-      const invalida = sel.find((v) => !opciones.includes(v))
-      if (invalida !== undefined) {
-        throw new BusinessError('OPCION_INVALIDA', `La opción "${invalida}" no pertenece a la pregunta.`, 422)
-      }
-      return { ...base, valorSeleccionMultiple: sel }
-    }
-  }
 }
 
 type RegistroRow = NonNullable<Awaited<ReturnType<typeof registrosRepository.buscarRegistro>>>
@@ -316,7 +259,7 @@ export const registrosService = {
     if (data.respuesta?.estado !== 'CERRADO') {
       throw new ConflictError('El reporte solo está disponible para registros cerrados.')
     }
-    const pdf = await htmlToPdf(construirHtmlReporte(data))
+    const pdf = await htmlToPdf(construirHtmlReporte({ ...data, obra: data.programacion.obra, fecha: data.programacion.fecha, fechaLabel: 'Fecha programada' }))
     return { pdf, obraCodigo: data.programacion.obra.codigo }
   },
 }

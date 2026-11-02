@@ -47,6 +47,7 @@ const FUNCIONES: Array<{ codigo: string; nombre: string; area: FuncionArea; orde
   { codigo: 'TEC_CAT_TIPOS_HALLAZGO', nombre: 'Tipos de Hallazgo', area: FuncionArea.TECNICA, orden: 6 },
   { codigo: 'TEC_CAT_ETAPAS_CONSTRUCTIVAS', nombre: 'Etapas Constructivas', area: FuncionArea.TECNICA, orden: 7 },
   { codigo: 'TEC_CAT_ETAPAS_NIDO', nombre: 'Etapas de Nido', area: FuncionArea.TECNICA, orden: 8 },
+  { codigo: 'TEC_REGISTROS', nombre: 'Registro de Formularios', area: FuncionArea.TECNICA, orden: 9 },
 ]
 
 async function seedFunciones() {
