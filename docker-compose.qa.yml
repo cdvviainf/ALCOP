@@ -37,12 +37,12 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
       PGDATA: /var/lib/postgresql/data/pgdata
-    # Exposición del puerto de la BD a Internet: OPCIONAL, solo para
-    # administración remota (pgAdmin), como en ENE. Comentado por defecto.
-    # Si se habilita, rotar DB_PASSWORD al terminar. Puerto 5434 para no chocar
-    # con ENE (5433) si comparten servidor.
-    # ports:
-    #   - "5434:5432"
+    # Acceso a la BD para administración/reportería (pgAdmin, BI). Atado a
+    # 127.0.0.1 del host: NO queda expuesto a Internet, solo se llega por túnel
+    # SSH (`ssh -N -L 5434:localhost:5434 root@<host>`). Puerto 5434 para no
+    # chocar con ENE (5433) si comparten servidor.
+    ports:
+      - "127.0.0.1:5434:5432"
     volumes:
       - alcop_qa_postgres_data:/var/lib/postgresql/data
     healthcheck:
