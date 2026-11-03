@@ -51,7 +51,7 @@ Zod en query, params y body; imagen ≤ `IMAGEN_MAX_MB`. Obra inexistente o elim
 ## 9. Integraciones
 
 - **Permiso**: función `TEC_REGISTROS` (área Técnica). Los perfiles existentes la reciben en `SIN_ACCESO`; se habilita desde Perfiles.
-- **Sidebar**: "Registro Técnico" en la sección Registro → `/registro/tecnica`.
+- **Sidebar**: "Registro Técnica" en la sección Registro → `/registro/tecnica`.
 
 ## 10. Pendientes
 

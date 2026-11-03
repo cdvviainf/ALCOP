@@ -107,7 +107,7 @@ export default function RegistroTecnicoPage() {
       <main className="flex-1 p-8">
         <div className="space-y-5">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-foreground">Registro Técnico</h1>
+            <h1 className="text-2xl font-bold text-foreground">Registro Técnica</h1>
             <p className="text-sm text-muted-foreground">
               Selecciona la obra y el formulario, complétalo y ciérralo con la fecha de revisión.
             </p>
