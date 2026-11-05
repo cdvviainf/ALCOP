@@ -29,7 +29,11 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // `/api` queda FUERA del matcher: Next limita a 10 MB (proxyClientMaxBodySize) el
+  // body de toda request que pasa por el proxy y trunca el resto, lo que rompía las
+  // subidas de fotos grandes (500 en POST /api/tecnica/visitas/:id/hallazgos). Las
+  // rutas /api son públicas para el gate igual, así que el proxy no aporta nada ahí.
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!api|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
   ],
 }
