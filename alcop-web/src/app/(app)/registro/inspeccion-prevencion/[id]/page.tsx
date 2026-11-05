@@ -6,6 +6,7 @@ import { FileText, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/lib/api'
+import { formatearTamano } from '@/lib/formato'
 import { cn } from 'cn'
 import { BreadcrumbBar } from '@/components/layout/top-bar'
 import { Button } from '@/components/ui/button'
@@ -530,6 +531,7 @@ function AgregarHallazgo({
               <div key={`${f.name}-${i}`} className="group relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={URL.createObjectURL(f)} alt={f.name} className="size-20 rounded-lg border border-border object-cover" />
+                <p className="mt-1 text-center text-[11px] text-muted-foreground">{formatearTamano(f.size)}</p>
                 <button
                   type="button"
                   aria-label="Quitar foto"
@@ -646,6 +648,7 @@ function FotoThumb({ foto, editable, onDeleted }: { foto: Foto; editable: boolea
     <div className="group relative">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={foto.url} alt="Hallazgo" className="size-24 rounded-lg border border-border object-cover" />
+      <p className="mt-1 text-center text-[11px] text-muted-foreground" title="Tamaño guardado (ya optimizado)">{formatearTamano(foto.tamano)}</p>
       {editable ? (
         <button
           type="button"
