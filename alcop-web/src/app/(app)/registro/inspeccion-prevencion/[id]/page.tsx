@@ -404,7 +404,7 @@ function AgregarHallazgo({
         <div className="space-y-1.5">
           <Label>Categoría</Label>
           <Select
-            value={categoriaId}
+            value={categoriaId ?? null}
             onValueChange={(v) => {
               if (typeof v === 'string') {
                 setCategoriaId(v)
@@ -428,7 +428,7 @@ function AgregarHallazgo({
         <div className="space-y-1.5">
           <Label>Subcategoría</Label>
           <Select
-            value={subcategoriaId}
+            value={subcategoriaId ?? null}
             onValueChange={(v) => typeof v === 'string' && setSubcategoriaId(v)}
             items={Object.fromEntries(subcategorias.map((s) => [String(s.id), s.nombre]))}
           >
@@ -447,7 +447,7 @@ function AgregarHallazgo({
         <div className="space-y-1.5">
           <Label>Nivel de riesgo</Label>
           <Select
-            value={nivelId}
+            value={nivelId ?? null}
             onValueChange={(v) => typeof v === 'string' && setNivelId(v)}
             items={Object.fromEntries(niveles.map((n) => [String(n.id), n.nombre]))}
           >
@@ -831,7 +831,7 @@ function EditarHallazgoDialog({
           <div className="space-y-1.5">
             <Label>Categoría</Label>
             <Select
-              value={categoriaId}
+              value={categoriaId ?? null}
               onValueChange={(v) => {
                 if (typeof v === 'string') {
                   setCategoriaId(v)
@@ -855,7 +855,7 @@ function EditarHallazgoDialog({
           <div className="space-y-1.5">
             <Label>Subcategoría</Label>
             <Select
-              value={subcategoriaId}
+              value={subcategoriaId ?? null}
               onValueChange={(v) => typeof v === 'string' && setSubcategoriaId(v)}
               items={Object.fromEntries(subcategorias.map((s) => [String(s.id), s.nombre]))}
             >
@@ -874,7 +874,7 @@ function EditarHallazgoDialog({
           <div className="space-y-1.5">
             <Label>Nivel de riesgo</Label>
             <Select
-              value={nivelId}
+              value={nivelId ?? null}
               onValueChange={(v) => typeof v === 'string' && setNivelId(v)}
               items={Object.fromEntries(niveles.map((n) => [String(n.id), n.nombre]))}
             >

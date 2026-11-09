@@ -358,8 +358,9 @@ function AgregarHallazgo({
     comentario.trim().length > 0 &&
     (!esHallazgo || (Boolean(tipoId) && archivos.length > 0))
 
+  // El lote se conserva entre altas: lo usual es cargar varios registros
+  // seguidos sobre la misma unidad.
   const resetear = () => {
-    setLoteUnidadId(undefined)
     setTipoRegistro('HALLAZGO')
     setTipoId(undefined)
     setComentario('')
@@ -407,7 +408,7 @@ function AgregarHallazgo({
         <div className="space-y-1.5">
           <Label>Unidad de lote</Label>
           <Select
-            value={loteUnidadId}
+            value={loteUnidadId ?? null}
             onValueChange={(v) => typeof v === 'string' && setLoteUnidadId(v)}
             items={Object.fromEntries(unidades.map((u) => [String(u.id), u.descripcion]))}
           >
@@ -444,7 +445,7 @@ function AgregarHallazgo({
         <div className="mt-3 space-y-1.5">
           <Label>Tipo de hallazgo</Label>
           <Select
-            value={tipoId}
+            value={tipoId ?? null}
             onValueChange={(v) => typeof v === 'string' && setTipoId(v)}
             items={Object.fromEntries(tipos.map((t) => [String(t.id), t.nombre]))}
           >
@@ -795,7 +796,7 @@ function EditarHallazgoDialog({
           <div className="space-y-1.5">
             <Label>Unidad de lote</Label>
             <Select
-              value={loteUnidadId}
+              value={loteUnidadId ?? null}
               onValueChange={(v) => typeof v === 'string' && setLoteUnidadId(v)}
               items={Object.fromEntries(unidades.map((u) => [String(u.id), u.descripcion]))}
             >
@@ -832,7 +833,7 @@ function EditarHallazgoDialog({
           <div className="space-y-1.5">
             <Label>Tipo de hallazgo</Label>
             <Select
-              value={tipoId}
+              value={tipoId ?? null}
               onValueChange={(v) => typeof v === 'string' && setTipoId(v)}
               items={Object.fromEntries(tipos.map((t) => [String(t.id), t.nombre]))}
             >
