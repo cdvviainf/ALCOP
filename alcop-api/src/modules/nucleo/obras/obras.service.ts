@@ -3,6 +3,7 @@ import { prisma } from '../../../lib/prisma.js'
 import { BusinessError, ConflictError, NotFoundError } from '../../../shared/errors.js'
 import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
+import type { AlcanceObras } from '../../../shared/obra-alcance.js'
 import { obrasRepository } from './obras.repository.js'
 import type {
   ActualizarLoteInput,
@@ -151,13 +152,14 @@ function validarAccesoParaRol(
 }
 
 export const obrasService = {
-  async listar(pagination: PaginationQuery, q?: string): Promise<Paginated<ObraDTO>> {
-    const { rows, total } = await obrasRepository.listar(pagination, q)
+  /** Solo las obras visibles para el alcance (acceso UsuarioObra; esAdmin ve todas). */
+  async listar(pagination: PaginationQuery, alcance: AlcanceObras, q?: string): Promise<Paginated<ObraDTO>> {
+    const { rows, total } = await obrasRepository.listar(pagination, alcance, q)
     return paginate(rows.map(toDTO), total, pagination)
   },
 
-  async obtener(id: number): Promise<ObraDTO> {
-    const obra = await obrasRepository.buscarPorId(id)
+  async obtener(id: number, alcance: AlcanceObras): Promise<ObraDTO> {
+    const obra = await obrasRepository.buscarPorId(id, alcance)
     if (!obra) throw new NotFoundError('Obra', String(id))
     return toDTO(obra)
   },

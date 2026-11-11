@@ -14,17 +14,18 @@ import {
   titularParamSchema,
 } from './obras.schema.js'
 import { obrasService } from './obras.service.js'
+import { alcanceDe } from '../../../shared/obra-alcance.js'
 
 /** Controladores thin (CLAUDE.md §12.5). */
 export const obrasController = {
   async listar(request: FastifyRequest, reply: FastifyReply) {
     const { page, limit, q } = listarObrasQuerySchema.parse(request.query)
-    return reply.send(await obrasService.listar({ page, limit }, q))
+    return reply.send(await obrasService.listar({ page, limit }, alcanceDe(request), q))
   },
 
   async obtener(request: FastifyRequest, reply: FastifyReply) {
     const { id } = obraIdParamSchema.parse(request.params)
-    return reply.send(await obrasService.obtener(id))
+    return reply.send(await obrasService.obtener(id, alcanceDe(request)))
   },
 
   async crear(request: FastifyRequest, reply: FastifyReply) {

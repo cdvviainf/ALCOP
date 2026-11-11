@@ -6,6 +6,7 @@ type DbClient = Prisma.TransactionClient | typeof prisma
 import type { PaginationQuery } from '../../../shared/pagination.js'
 import { toPrismaRange } from '../../../shared/pagination.js'
 import type { ActualizarObraInput, CrearObraInput } from './obras.schema.js'
+import { whereObrasVisibles, type AlcanceObras } from '../../../shared/obra-alcance.js'
 
 const titularInclude = {
   usuario: { select: { id: true, nombre: true, email: true } },
@@ -13,9 +14,10 @@ const titularInclude = {
 
 /** Acceso a datos de Obra y sus titulares (CLAUDE.md §12.2). */
 export const obrasRepository = {
-  async listar(pagination: PaginationQuery, q?: string) {
+  async listar(pagination: PaginationQuery, alcance: AlcanceObras, q?: string) {
     const where: Prisma.ObraWhereInput = {
       eliminadoEn: null,
+      ...whereObrasVisibles(alcance),
       ...(q
         ? {
             OR: [
@@ -33,8 +35,8 @@ export const obrasRepository = {
     return { rows, total }
   },
 
-  async buscarPorId(id: number) {
-    return prisma.obra.findFirst({ where: { id, eliminadoEn: null } })
+  async buscarPorId(id: number, alcance?: AlcanceObras) {
+    return prisma.obra.findFirst({ where: { id, eliminadoEn: null, ...(alcance ? whereObrasVisibles(alcance) : {}) } })
   },
 
   async crear(data: CrearObraInput, creadoPor: string) {
