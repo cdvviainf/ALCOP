@@ -12,11 +12,30 @@ const diaSchema = z
     return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
   }, 'Fecha inexistente')
 
-/** Lista de formularios a agendar (ids únicos, al menos uno). */
+const MSG_VENTANA = 'La fecha de término no puede ser anterior a la de inicio.'
+const ventanaCoherente = (v: { fechaInicio?: string; fechaTermino?: string }) =>
+  !v.fechaInicio || !v.fechaTermino || v.fechaTermino >= v.fechaInicio
+
+/** Línea a agendar. Las fechas solo aplican a TECNICA (por defecto = fecha del día). */
+const lineaSchema = z
+  .object({
+    formularioId: z.coerce.number().int().positive(),
+    fechaInicio: diaSchema.optional(),
+    fechaTermino: diaSchema.optional(),
+  })
+  .refine(ventanaCoherente, { message: MSG_VENTANA, path: ['fechaTermino'] })
+
+/** Prevención: lista de ids (sin fechas por formulario) → se normaliza a líneas. */
 const formularioIdsSchema = z
   .array(z.coerce.number().int().positive())
   .min(1, 'Selecciona al menos un formulario')
-  .transform((ids) => Array.from(new Set(ids)))
+  .transform((ids) => Array.from(new Set(ids)).map((formularioId) => ({ formularioId })))
+
+/** Técnica: líneas con ventana; un formulario no se repite en el mismo envío. */
+const lineasTecnicaSchema = z
+  .array(lineaSchema)
+  .min(1, 'Selecciona al menos un formulario')
+  .refine((ls) => new Set(ls.map((l) => l.formularioId)).size === ls.length, 'Hay formularios repetidos.')
 
 export const listarProgramacionQuerySchema = z.object({
   obraId: z.coerce.number().int().positive(),
@@ -37,22 +56,50 @@ export const formularioProgramadoParamSchema = z.object({
   fpId: z.coerce.number().int().positive(), // formulario programado
 })
 
-export const crearProgramacionSchema = z.object({
+const comentarioSchema = z.string().trim().min(1).max(2000).nullable().optional()
+
+export const crearProgramacionPrevencionSchema = z
+  .object({ obraId: z.coerce.number().int().positive(), fecha: diaSchema, comentario: comentarioSchema, formularioIds: formularioIdsSchema })
+  .transform(({ formularioIds, ...rest }) => ({ ...rest, formularios: formularioIds }))
+
+export const crearProgramacionTecnicaSchema = z.object({
   obraId: z.coerce.number().int().positive(),
   fecha: diaSchema,
-  comentario: z.string().trim().min(1).max(2000).nullable().optional(),
-  formularioIds: formularioIdsSchema,
+  comentario: comentarioSchema,
+  formularios: lineasTecnicaSchema,
 })
 
 export const actualizarComentarioSchema = z.object({
   comentario: z.string().trim().min(1).max(2000).nullable(),
 })
 
-export const agregarFormulariosSchema = z.object({
-  formularioIds: formularioIdsSchema,
-})
+export const agregarFormulariosPrevencionSchema = z
+  .object({ formularioIds: formularioIdsSchema })
+  .transform(({ formularioIds }) => ({ formularios: formularioIds }))
+
+export const agregarFormulariosTecnicaSchema = z.object({ formularios: lineasTecnicaSchema })
+
+/** Edición de la ventana de un formulario técnico agendado. */
+export const actualizarVentanaSchema = z
+  .object({ fechaInicio: diaSchema, fechaTermino: diaSchema })
+  .refine(ventanaCoherente, { message: MSG_VENTANA, path: ['fechaTermino'] })
+
+/** Línea normalizada (ambas áreas). */
+export interface LineaInput {
+  formularioId: number
+  fechaInicio?: string
+  fechaTermino?: string
+}
 
 export type ListarProgramacionQuery = z.infer<typeof listarProgramacionQuerySchema>
-export type CrearProgramacionInput = z.infer<typeof crearProgramacionSchema>
+export interface CrearProgramacionInput {
+  obraId: number
+  fecha: string
+  comentario?: string | null
+  formularios: LineaInput[]
+}
 export type ActualizarComentarioInput = z.infer<typeof actualizarComentarioSchema>
-export type AgregarFormulariosInput = z.infer<typeof agregarFormulariosSchema>
+export interface AgregarFormulariosInput {
+  formularios: LineaInput[]
+}
+export type ActualizarVentanaInput = z.infer<typeof actualizarVentanaSchema>

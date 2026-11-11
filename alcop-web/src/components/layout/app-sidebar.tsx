@@ -116,7 +116,7 @@ const NAV: Seccion[] = [
       { title: 'Obras', href: '/obras', icon: Building2, requiere: ['OBRAS'] },
       { title: 'Procedimientos', href: '/configuracion/procedimientos', icon: ScrollText, requiere: ['PROCEDIMIENTOS'] },
       { title: 'Formularios', href: '/formularios', icon: ClipboardCheck, requiere: ['PREV_FORMULARIOS', 'TEC_FORMULARIOS'] },
-      { title: 'Calendario', href: '/prevencion/programacion', icon: CalendarDays, requiere: ['PREV_PROGRAMACION'] },
+      { title: 'Calendario', href: '/programacion', icon: CalendarDays, requiere: ['PREV_PROGRAMACION', 'TEC_PROGRAMACION'] },
       {
         title: 'Datos Maestros',
         icon: Database,

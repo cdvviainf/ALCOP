@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import type { AreaProgramacion, Prisma, RolObra } from '@prisma/client'
 import { prisma } from '../../../lib/prisma.js'
 
 /** Cliente Prisma o de transacción (secciones con lock por fila de la obra). */
@@ -12,12 +12,23 @@ const diaInclude = {
     select: {
       id: true,
       orden: true,
+      fechaInicio: true,
+      fechaTermino: true,
       formulario: { select: { id: true, codigo: true, nombre: true } },
     },
   },
 } as const
 
-/** Acceso a datos de Programación de Prevención (CLAUDE.md §12.2). */
+/** Titular de la obra que se toma como responsable snapshot, por área. */
+const ROL_RESPONSABLE: Record<AreaProgramacion, RolObra> = {
+  PREVENCION: 'PREVENCIONISTA',
+  TECNICA: 'JEFE_DE_TERRENO',
+}
+
+/**
+ * Acceso a datos de Programación (CLAUDE.md §12.2). Toda consulta por id/obra va
+ * acotada al `area`: una ruta de Prevención no alcanza días de Técnica ni al revés.
+ */
 export const programacionRepository = {
   /** ¿La obra existe y está viva? (404 del calendario, QA-PP-002). */
   async obraViva(obraId: number): Promise<boolean> {
@@ -25,39 +36,61 @@ export const programacionRepository = {
     return o !== null
   },
 
-  /** Agendamientos vivos de una obra viva en el rango [desde, hasta) (el mes del calendario). */
-  async listarRango(obraId: number, desde: Date, hasta: Date) {
+  /**
+   * Agendamientos vivos de una obra viva visibles en [desde, hasta) (el mes). En
+   * TECNICA también entran los días cuyos formularios inician o terminan en el mes
+   * (ambas fechas se marcan en el calendario aunque el día agendado sea de otro mes).
+   */
+  async listarRango(area: AreaProgramacion, obraId: number, desde: Date, hasta: Date) {
+    const enRango = { gte: desde, lt: hasta }
     return prisma.programacionPrevencion.findMany({
-      where: { obraId, eliminadoEn: null, obra: { eliminadoEn: null }, fecha: { gte: desde, lt: hasta } },
+      where: {
+        obraId,
+        area,
+        eliminadoEn: null,
+        obra: { eliminadoEn: null },
+        OR: [
+          { fecha: enRango },
+          ...(area === 'TECNICA'
+            ? [
+                {
+                  formularios: {
+                    some: { eliminadoEn: null, OR: [{ fechaInicio: enRango }, { fechaTermino: enRango }] },
+                  },
+                },
+              ]
+            : []),
+        ],
+      },
       orderBy: { fecha: 'asc' },
       include: diaInclude,
     })
   },
 
-  async buscarDia(id: number) {
+  async buscarDia(area: AreaProgramacion, id: number) {
     return prisma.programacionPrevencion.findFirst({
-      where: { id, eliminadoEn: null, obra: { eliminadoEn: null } },
+      where: { id, area, eliminadoEn: null, obra: { eliminadoEn: null } },
       include: diaInclude,
     })
   },
 
-  async buscarDiaBasico(id: number, db: DbClient = prisma) {
-    return db.programacionPrevencion.findFirst({ where: { id, eliminadoEn: null }, select: { id: true } })
+  async buscarDiaBasico(area: AreaProgramacion, id: number, db: DbClient = prisma) {
+    return db.programacionPrevencion.findFirst({ where: { id, area, eliminadoEn: null, obra: { eliminadoEn: null } }, select: { id: true, fecha: true } })
   },
 
-  /** Agendamiento vivo de (obra, fecha), para reutilizar/anexar en vez de duplicar. */
-  async buscarPorObraFecha(obraId: number, fecha: Date, db: DbClient = prisma) {
+  /** Agendamiento vivo de (obra, fecha, área), para reutilizar/anexar en vez de duplicar. */
+  async buscarPorObraFecha(area: AreaProgramacion, obraId: number, fecha: Date, db: DbClient = prisma) {
     return db.programacionPrevencion.findFirst({
-      where: { obraId, fecha, eliminadoEn: null },
+      where: { obraId, fecha, area, eliminadoEn: null },
       select: { id: true },
     })
   },
 
   /** Bloquea el día vivo (FOR UPDATE) — serializa quitar líneas en paralelo (QA-PP-005). */
-  async lockDia(tx: Prisma.TransactionClient, id: number): Promise<boolean> {
+  async lockDia(tx: Prisma.TransactionClient, area: AreaProgramacion, id: number): Promise<boolean> {
     const rows = await tx.$queryRaw<
       Array<{ id: number }>
-    >`SELECT id FROM "ProgramacionPrevencion" WHERE id = ${id} AND "eliminadoEn" IS NULL FOR UPDATE`
+    >`SELECT id FROM "ProgramacionPrevencion" WHERE id = ${id} AND area = ${area}::"AreaProgramacion" AND "eliminadoEn" IS NULL FOR UPDATE`
     return rows.length > 0
   },
 
@@ -69,21 +102,29 @@ export const programacionRepository = {
     return rows.length > 0
   },
 
-  /** Titular PREVENCIONISTA vivo de la obra (snapshot del responsable). */
-  async titularPrevencionista(obraId: number, db: DbClient = prisma): Promise<string | null> {
+  /** Titular vivo de la obra responsable del área (snapshot). */
+  async titularResponsable(area: AreaProgramacion, obraId: number, db: DbClient = prisma): Promise<string | null> {
     const row = await db.obraTitular.findFirst({
-      where: { obraId, rolObra: 'PREVENCIONISTA', eliminadoEn: null },
+      where: { obraId, rolObra: ROL_RESPONSABLE[area], eliminadoEn: null },
       select: { usuarioId: true },
     })
     return row?.usuarioId ?? null
   },
 
   async crearDia(
-    data: { obraId: number; fecha: Date; comentario: string | null; usuarioId: string | null; creadoPor: string },
+    data: {
+      area: AreaProgramacion
+      obraId: number
+      fecha: Date
+      comentario: string | null
+      usuarioId: string | null
+      creadoPor: string
+    },
     db: DbClient = prisma
   ) {
     return db.programacionPrevencion.create({
       data: {
+        area: data.area,
         obraId: data.obraId,
         fecha: data.fecha,
         comentario: data.comentario,
@@ -107,10 +148,10 @@ export const programacionRepository = {
     await db.programacionPrevencion.update({ where: { id }, data: { eliminadoEn: ahora, eliminadoPor } })
   },
 
-  /** Formulario activo del área PREVENCION (validación de lo agendable). */
-  async formularioPrevencionActivo(formularioId: number, db: DbClient = prisma) {
+  /** Formulario activo del área (validación de lo agendable). Area.codigo = PREVENCION|TECNICA. */
+  async formularioActivoDeArea(area: AreaProgramacion, formularioId: number, db: DbClient = prisma) {
     return db.formulario.findFirst({
-      where: { id: formularioId, eliminadoEn: null, activo: true, area: { codigo: 'PREVENCION' } },
+      where: { id: formularioId, eliminadoEn: null, activo: true, area: { codigo: area } },
       select: { id: true },
     })
   },
@@ -128,12 +169,16 @@ export const programacionRepository = {
 
   async crearLinea(
     programacionId: number,
-    formularioId: number,
+    linea: { formularioId: number; fechaInicio: Date | null; fechaTermino: Date | null },
     orden: number,
     creadoPor: string,
     db: DbClient = prisma
   ) {
-    return db.formularioProgramado.create({ data: { programacionId, formularioId, orden, creadoPor } })
+    return db.formularioProgramado.create({ data: { programacionId, ...linea, orden, creadoPor } })
+  },
+
+  async actualizarVentana(fpId: number, fechaInicio: Date, fechaTermino: Date, db: DbClient = prisma) {
+    return db.formularioProgramado.update({ where: { id: fpId }, data: { fechaInicio, fechaTermino } })
   },
 
   /** Bloquea un FormularioProgramado (FOR UPDATE) — serializa con el cierre (QA-RP-009). */
@@ -175,13 +220,13 @@ export const programacionRepository = {
     return db.formularioProgramado.update({ where: { id: fpId }, data: { eliminadoEn: new Date(), eliminadoPor } })
   },
 
-  /** Picker: formularios activos de Prevención (para el multiselect del día). */
-  async opcionesFormularios(q?: string) {
+  /** Picker: formularios activos del área (para el multiselect del día). */
+  async opcionesFormularios(area: AreaProgramacion, q?: string) {
     return prisma.formulario.findMany({
       where: {
         eliminadoEn: null,
         activo: true,
-        area: { codigo: 'PREVENCION' },
+        area: { codigo: area },
         ...(q
           ? { OR: [{ nombre: { contains: q, mode: 'insensitive' } }, { codigo: { contains: q, mode: 'insensitive' } }] }
           : {}),

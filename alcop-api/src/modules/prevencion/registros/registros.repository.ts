@@ -42,8 +42,11 @@ const conContenido: Prisma.RespuestaPreguntaWhereInput = {
 
 /** Filtro de registros (formularios agendados) por obra y estado derivado. */
 function buildWhere(obraId: number, estado: EstadoRegistro | undefined, hoyDate: Date): Prisma.FormularioProgramadoWhereInput {
+  // Solo agendamientos de Prevención: las líneas técnicas del calendario (v0.2) no
+  // son registros de Prevención.
   const programacion: Prisma.ProgramacionPrevencionWhereInput = {
     eliminadoEn: null,
+    area: 'PREVENCION',
     obraId,
     obra: { eliminadoEn: null },
   }
@@ -93,7 +96,7 @@ export const registrosRepository = {
       where: {
         id: fpId,
         eliminadoEn: null,
-        programacion: { eliminadoEn: null, obra: { eliminadoEn: null } },
+        programacion: { eliminadoEn: null, area: 'PREVENCION', obra: { eliminadoEn: null } },
       },
       include: {
         programacion: { select: { fecha: true, obra: obraSelect } },
@@ -122,7 +125,7 @@ export const registrosRepository = {
   /** Datos crudos del registro para el PDF (incluye binario de fotos). */
   async reporteData(fpId: number) {
     return prisma.formularioProgramado.findFirst({
-      where: { id: fpId, eliminadoEn: null, programacion: { eliminadoEn: null, obra: { eliminadoEn: null } } },
+      where: { id: fpId, eliminadoEn: null, programacion: { eliminadoEn: null, area: 'PREVENCION', obra: { eliminadoEn: null } } },
       include: {
         programacion: { select: { fecha: true, obra: { select: { codigo: true, nombre: true } } } },
         formulario: { select: { codigo: true, nombre: true, preguntas: preguntaSelect } },

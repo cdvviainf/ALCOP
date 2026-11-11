@@ -219,7 +219,7 @@ alcop-web/
 | `nucleo-compartido.md` | Pendiente de spec | Obra, PanelResumen |
 | `lotes-procedimientos.md` | **Cerrado (v0.1, 12-10-2026)** | TipoLote, Procedimiento (PDF), TipoLoteProcedimiento, ProcedimientoFormulario, ObraLote; cadena Obra→Lotes→Procedimientos→Formularios + derivación de formularios aplicables |
 | `prevencion.md` | **v0.1 (22-10-2026)** — Ola 1 (clasificación Categoría › Subcategoría) + Ola 2 (Visitas de Prevención) cerradas; AnalisisIA pendiente | SubcategoriaFormulario, VisitaPrevencion, HallazgoPrevencion; (pend.) AnalisisIA |
-| `programacion-prevencion.md` | **v0.1 (27-10-2026)** — Ola 1 (calendario de agendamiento por obra) implementada; cumplimiento/alertas diferidos | ProgramacionPrevencion, FormularioProgramado; función `PREV_PROGRAMACION` |
+| `programacion-prevencion.md` | **v0.2 (09-11-2026)** — calendario por obra para Prevención **y Técnica** (ventana inicio/término por formulario técnico); cumplimiento/alertas diferidos | ProgramacionPrevencion (+`area`), FormularioProgramado (+`fechaInicio/fechaTermino`); funciones `PREV_PROGRAMACION`, `TEC_PROGRAMACION` |
 | `registros-prevencion.md` | **v0.1 (27-10-2026)** — Ola 1 (llenado de formularios agendados + fotos en BD + cierre con fecha de revisión) implementada; concreta el motor de respuestas (FD-001) | RespuestaFormulario (estado/fechaRevision/link), RespuestaPregunta (+@@unique), RespuestaPreguntaFoto(+Data); función `PREV_REGISTROS` |
 | `registros-tecnica.md` | **v0.1 (02-11-2026)** — aplicación directa de formularios técnicos (obra + formulario, sin calendario) | RespuestaFormulario directa (`formularioProgramadoId` null); función `TEC_REGISTROS` |
 | `tecnica.md` | Pendiente de spec | VisitaTecnica, HitoEtapa (nidos/puntales), AnalisisIA |

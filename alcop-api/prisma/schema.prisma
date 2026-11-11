@@ -738,10 +738,19 @@ model HallazgoPrevencionFotoData {
 // NOTA: el cumplimiento (estado/respuesta) llega con el motor de respuestas
 // (diferido); hoy esto es solo planificación — ver spec §10.
 
+// v0.2 (09-11-2026): el calendario agenda formularios de Prevención O de Técnica.
+// `area` separa los días: unicidad viva por (obraId, fecha, area). El nombre del
+// modelo/tabla se conserva por compatibilidad (no se renombra la tabla).
+enum AreaProgramacion {
+  PREVENCION
+  TECNICA
+}
+
 model ProgramacionPrevencion {
   id             Int                    @id @default(autoincrement())
   obraId         Int
   obra           Obra                   @relation(fields: [obraId], references: [id])
+  area           AreaProgramacion       @default(PREVENCION)
   fecha          DateTime               @db.Date
   comentario     String?
   // Snapshot del titular PREVENCIONISTA de la obra al crear (null si la obra no
@@ -766,6 +775,10 @@ model FormularioProgramado {
   formularioId   Int
   formulario     Formulario             @relation(fields: [formularioId], references: [id])
   orden          Int                    @default(0)
+  // Solo TECNICA (obligatorias ahí; null en PREVENCION): ventana de ejecución del
+  // formulario. Por defecto ambas = fecha del día agendado.
+  fechaInicio    DateTime?              @db.Date
+  fechaTermino   DateTime?              @db.Date
   // Registro de llenado originado por este agendamiento (1:0..1).
   respuesta      RespuestaFormulario?
   creadoEn       DateTime               @default(now())

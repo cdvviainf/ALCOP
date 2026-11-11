@@ -110,9 +110,10 @@ await app.register(import('./modules/prevencion/visitas/visitas.routes.js'), { p
 await app.register(import('./modules/prevencion/niveles-riesgo/niveles-riesgo.routes.js'), {
   prefix: '/api/prevencion',
 })
-await app.register(import('./modules/prevencion/programacion/programacion.routes.js'), {
-  prefix: '/api/prevencion',
-})
+// Programación (calendario): mismo módulo montado por área (programacion-prevencion.md v0.2).
+const { programacionRoutes } = await import('./modules/prevencion/programacion/programacion.routes.js')
+await app.register(programacionRoutes('PREVENCION'), { prefix: '/api/prevencion' })
+await app.register(programacionRoutes('TECNICA'), { prefix: '/api/tecnica' })
 await app.register(import('./modules/prevencion/registros/registros.routes.js'), {
   prefix: '/api/prevencion',
 })
