@@ -70,6 +70,13 @@ const AREA = {
   TECNICA: { nombre: 'Técnica', chip: 'bg-sky-600/10 text-sky-700' },
 } as const
 
+const COLOR_ESTADO: Record<EstadoObra, { nombre: string; color: string }> = {
+  EN_EJECUCION: { nombre: 'En ejecución', color: '#1e7b34' },
+  SIN_INICIAR: { nombre: 'Sin iniciar', color: '#0284c7' },
+  SUSPENDIDA: { nombre: 'Suspendida', color: '#c2410c' },
+  TERMINADA: { nombre: 'Terminada', color: '#8f8a82' },
+}
+
 const ESTADO_OBRA: Record<EstadoObra, { label: string; dot: string }> = {
   EN_EJECUCION: { label: 'en ejecución', dot: 'bg-ok-fg' },
   SIN_INICIAR: { label: 'sin iniciar', dot: 'bg-sky-600' },
@@ -132,41 +139,48 @@ function BarraApilada({ area, items, alto = 'h-2' }: { area: Area; items: Catego
   )
 }
 
-/** Tarjeta KPI de un área: título · número de visitas a la izquierda · hallazgos en filas a la derecha. */
-function KpiArea({ area, titulo, data }: { area: Area; titulo: string; data: AreaResumen }) {
+interface FilaKpi {
+  key: string
+  n: number
+  nombre: string
+  color: string
+}
+
+/**
+ * Tarjeta KPI uniforme (Obras / Técnica / Prevención): título · número grande
+ * centrado a la izquierda · filas a la derecha alineadas desde arriba.
+ */
+function KpiCard({ titulo, total, etiquetaTotal, filas }: { titulo: string; total: number; etiquetaTotal: string; filas: FilaKpi[] }) {
   return (
     <Tarjeta className="flex flex-col">
       <h3 className="text-xl font-bold leading-tight">{titulo}</h3>
       <div className="my-4 h-px bg-border" />
-      <div className="grid flex-1 grid-cols-[minmax(0,.8fr)_minmax(0,1.6fr)] gap-4">
-        <div className="flex items-center justify-center border-r border-border pr-4">
-          <span
-            className="text-[64px] font-bold leading-none tracking-tight tabular-nums"
-            aria-label={`${data.visitas} ${pl(data.visitas, 'visita', 'visitas')}`}
-          >
-            {fmt.format(data.visitas)}
+      <div className="grid flex-1 grid-cols-[minmax(3.5rem,.6fr)_minmax(0,1.6fr)] gap-3">
+        <div className="flex items-center justify-center border-r border-border pr-3">
+          <span className="text-[64px] font-bold leading-none tracking-tight tabular-nums" aria-label={`${total} ${etiquetaTotal}`}>
+            {fmt.format(total)}
           </span>
         </div>
-        <ul className="flex flex-col justify-center gap-2" aria-label="Hallazgos">
-          {data.hallazgos.map((c, i) => {
-            const color = colorDe(area, c, i)
-            return (
-              <li
-                key={c.codigo}
-                className="flex items-center gap-3 rounded-xl px-3.5 py-2"
-                style={{ background: `color-mix(in oklab, ${color} 12%, transparent)` }}
-              >
-                <span className="min-w-7 text-xl font-bold tabular-nums leading-none">{fmt.format(c.n)}</span>
-                <i className="size-2.5 flex-none rounded-full" style={{ background: color }} />
-                <span className="truncate text-sm">{c.nombre}</span>
-              </li>
-            )
-          })}
+        <ul className="flex flex-col gap-2" aria-label={titulo}>
+          {filas.map((f) => (
+            <li
+              key={f.key}
+              className="flex h-9 items-center gap-2.5 rounded-xl px-3"
+              style={{ background: `color-mix(in oklab, ${f.color} 12%, transparent)` }}
+            >
+              <span className="min-w-6 text-lg font-bold leading-none tabular-nums">{fmt.format(f.n)}</span>
+              <i className="size-2.5 flex-none rounded-full" style={{ background: f.color }} />
+              <span className="truncate text-sm">{f.nombre}</span>
+            </li>
+          ))}
         </ul>
       </div>
     </Tarjeta>
   )
 }
+
+const filasArea = (area: Area, data: AreaResumen): FilaKpi[] =>
+  data.hallazgos.map((c, i) => ({ key: c.codigo, n: c.n, nombre: c.nombre, color: colorDe(area, c, i) }))
 
 function FilaAgenda({ a, hoy, puedeRegistrar }: { a: AgendaItem; hoy: string; puedeRegistrar: boolean }) {
   const enCurso = a.area === 'TECNICA' && a.fecha < hoy && a.vence >= hoy
@@ -311,7 +325,7 @@ function TarjetaObra({ o }: { o: ObraResumen }) {
 function Cargando() {
   return (
     <div className="space-y-7" aria-busy="true" aria-label="Cargando dashboard">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,.75fr)_repeat(2,minmax(0,1.4fr))]">
+      <div className="grid gap-4 lg:grid-cols-3">
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} className="h-60 rounded-2xl" />
         ))}
@@ -373,40 +387,32 @@ export default function DashboardPage() {
                 aria-label="Resumen general"
                 className={cn(
                   'grid gap-4 md:grid-cols-2',
-                  nAreas === 2 && 'xl:grid-cols-[minmax(0,.75fr)_repeat(2,minmax(0,1.4fr))]',
-                  nAreas === 1 && 'xl:grid-cols-[minmax(0,.75fr)_minmax(0,2fr)]'
+                  nAreas === 2 && '[&>*:first-child]:md:col-span-2 xl:[&>*:first-child]:col-span-1',
+                  nAreas === 2 && 'xl:grid-cols-3',
+                  nAreas === 1 && 'xl:grid-cols-2'
                 )}
               >
-                <Tarjeta className={cn('flex flex-col', nAreas === 2 && 'md:col-span-2 xl:col-span-1')}>
-                  <h3 className="text-[13px] font-semibold text-muted-foreground">
-                    {d.obras.total === 1 ? 'Obra con acceso' : 'Obras con acceso'}
-                  </h3>
-                  <div className="mt-2 text-[76px] font-bold leading-none tracking-tight tabular-nums">{d.obras.total}</div>
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <i className={cn('size-2 rounded-full', ESTADO_OBRA.EN_EJECUCION.dot)} />
-                      {d.obras.porEstado.EN_EJECUCION} en ejecución
-                    </span>
-                    {(['SIN_INICIAR', 'SUSPENDIDA', 'TERMINADA'] as const).map((e) =>
-                      d.obras.porEstado[e] ? (
-                        <span key={e} className="flex items-center gap-1.5">
-                          <i className={cn('size-2 rounded-full', ESTADO_OBRA[e].dot)} />
-                          {d.obras.porEstado[e]} {ESTADO_OBRA[e].label}
-                        </span>
-                      ) : null
-                    )}
-                  </div>
-                  {d.obras.total === 0 ? (
-                    <p className="mt-4 text-sm text-muted-foreground">
-                      Aún no tienes obras asignadas. Pide acceso a un administrador.
-                    </p>
-                  ) : null}
-                </Tarjeta>
+                <KpiCard
+                  titulo="Obras"
+                  total={d.obras.total}
+                  etiquetaTotal={pl(d.obras.total, 'obra con acceso', 'obras con acceso')}
+                  filas={(['EN_EJECUCION', 'SIN_INICIAR', 'SUSPENDIDA', 'TERMINADA'] as const).map((e) => ({
+                    key: e,
+                    n: d.obras.porEstado[e],
+                    nombre: COLOR_ESTADO[e].nombre,
+                    color: COLOR_ESTADO[e].color,
+                  }))}
+                />
                 {d.tecnica ? (
-                  <KpiArea area="TECNICA" titulo="Visitas Técnicas" data={d.tecnica} />
+                  <KpiCard titulo="Visitas Técnicas" total={d.tecnica.visitas} etiquetaTotal="visitas técnicas" filas={filasArea('TECNICA', d.tecnica)} />
                 ) : null}
                 {d.prevencion ? (
-                  <KpiArea area="PREVENCION" titulo="Visitas de Prevención" data={d.prevencion} />
+                  <KpiCard
+                    titulo="Visitas de Prevención"
+                    total={d.prevencion.visitas}
+                    etiquetaTotal="visitas de prevención"
+                    filas={filasArea('PREVENCION', d.prevencion)}
+                  />
                 ) : null}
               </section>
 
