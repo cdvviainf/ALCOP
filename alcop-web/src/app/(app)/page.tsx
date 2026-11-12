@@ -55,21 +55,15 @@ interface Dashboard {
   agenda: { dias: number; atrasadas: AgendaItem[]; proximas: AgendaItem[] }
 }
 
-// ─── Colores: el color sigue a la entidad (catálogos por código; fallback por índice) ──
-const COLOR_CATEGORIA: Record<string, string> = {
+// ─── Colores por área: el color sigue a la entidad (catálogos por código; fallback por índice) ──
+const COLOR_CATEGORIA: Record<Area, Record<string, string>> = {
+  // Técnica — tipo de hallazgo (severidad: rojo › naranjo › amarillo)
+  TECNICA: { NO_CONFORMIDAD: '#d9412f', MEJORA: '#f08a24', SUGERENCIA: '#f2c230', SIN_TIPO: '#9a9a95' },
   // Prevención — nivel de riesgo
-  ALTO: '#d9412f',
-  MEDIO: '#e29a1c',
-  OBSERVACION: '#3a78c9',
-  // Técnica — tipo de hallazgo
-  MEJORA: '#14807f',
-  SUGERENCIA: '#6a4cc2',
-  // Ambos
-  NO_CONFORMIDAD: '#3d3a36',
-  SIN_TIPO: '#9a9a95',
+  PREVENCION: { ALTO: '#d9412f', MEDIO: '#e29a1c', OBSERVACION: '#3a78c9', NO_CONFORMIDAD: '#3d3a36' },
 }
 const PALETA = ['#3a78c9', '#14807f', '#6a4cc2', '#e29a1c', '#d9412f', '#3d3a36']
-const colorDe = (c: Categoria, i: number) => COLOR_CATEGORIA[c.codigo] ?? PALETA[i % PALETA.length]
+const colorDe = (area: Area, c: Categoria, i: number) => COLOR_CATEGORIA[area][c.codigo] ?? PALETA[i % PALETA.length]
 
 const AREA = {
   PREVENCION: { nombre: 'Prevención', chip: 'bg-primary/10 text-primary' },
@@ -118,7 +112,7 @@ function ChipArea({ area }: { area: Area }) {
 }
 
 /** Barra apilada proporcional (sin librería de gráficos: CSS puro, render instantáneo). */
-function BarraApilada({ items, alto = 'h-2' }: { items: Categoria[]; alto?: string }) {
+function BarraApilada({ area, items, alto = 'h-2' }: { area: Area; items: Categoria[]; alto?: string }) {
   const total = items.reduce((s, c) => s + c.n, 0)
   const etiqueta = items.map((c) => `${c.n} ${c.nombre}`).join(', ')
   if (!total) return <div className={cn('rounded-full bg-muted', alto)} aria-label="Sin hallazgos" />
@@ -130,7 +124,7 @@ function BarraApilada({ items, alto = 'h-2' }: { items: Categoria[]; alto?: stri
             key={c.codigo}
             title={`${c.nombre}: ${c.n}`}
             className="block min-w-1 rounded-full"
-            style={{ flex: c.n, background: colorDe(c, i) }}
+            style={{ flex: c.n, background: colorDe(area, c, i) }}
           />
         ) : null
       )}
@@ -138,47 +132,37 @@ function BarraApilada({ items, alto = 'h-2' }: { items: Categoria[]; alto?: stri
   )
 }
 
-function Mosaicos({ items }: { items: Categoria[] }) {
-  return (
-    <div
-      className={cn(
-        'grid gap-2',
-        items.length <= 3 ? 'grid-cols-3' : items.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'
-      )}
-    >
-      {items.map((c, i) => {
-        const color = colorDe(c, i)
-        return (
-          <div key={c.codigo} className="rounded-xl px-2.5 py-2" style={{ background: `${color}14` }}>
-            <div className="text-2xl font-bold tabular-nums leading-tight">{fmt.format(c.n)}</div>
-            <div className="mt-0.5 flex items-center gap-1.5 text-xs leading-tight text-muted-foreground">
-              <i className="size-2 flex-none rounded-full" style={{ background: color }} />
-              {c.nombre}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function KpiArea({ area, titulo, subtitulo, data }: { area: Area; titulo: string; subtitulo: string; data: AreaResumen }) {
-  const total = data.hallazgos.reduce((s, c) => s + c.n, 0)
+/** Tarjeta KPI de un área: título · número de visitas a la izquierda · hallazgos en filas a la derecha. */
+function KpiArea({ area, titulo, data }: { area: Area; titulo: string; data: AreaResumen }) {
   return (
     <Tarjeta className="flex flex-col">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-muted-foreground">{titulo}</h3>
-        <ChipArea area={area} />
-      </div>
-      <div className="mt-2 text-[44px] font-bold leading-none tracking-tight tabular-nums">{fmt.format(data.visitas)}</div>
+      <h3 className="text-xl font-bold leading-tight">{titulo}</h3>
       <div className="my-4 h-px bg-border" />
-      <div className="mb-2.5 flex items-baseline justify-between gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-label">{subtitulo}</h4>
-        <span className="text-xs text-muted-foreground tabular-nums">{fmt.format(total)} en total</span>
-      </div>
-      <Mosaicos items={data.hallazgos} />
-      <div className="mt-3">
-        <BarraApilada items={data.hallazgos} />
+      <div className="grid flex-1 grid-cols-[minmax(0,.8fr)_minmax(0,1.6fr)] gap-4">
+        <div className="flex items-center justify-center border-r border-border pr-4">
+          <span
+            className="text-[64px] font-bold leading-none tracking-tight tabular-nums"
+            aria-label={`${data.visitas} ${pl(data.visitas, 'visita', 'visitas')}`}
+          >
+            {fmt.format(data.visitas)}
+          </span>
+        </div>
+        <ul className="flex flex-col justify-center gap-2" aria-label="Hallazgos">
+          {data.hallazgos.map((c, i) => {
+            const color = colorDe(area, c, i)
+            return (
+              <li
+                key={c.codigo}
+                className="flex items-center gap-3 rounded-xl px-3.5 py-2"
+                style={{ background: `color-mix(in oklab, ${color} 12%, transparent)` }}
+              >
+                <span className="min-w-7 text-xl font-bold tabular-nums leading-none">{fmt.format(c.n)}</span>
+                <i className="size-2.5 flex-none rounded-full" style={{ background: color }} />
+                <span className="truncate text-sm">{c.nombre}</span>
+              </li>
+            )
+          })}
+        </ul>
       </div>
     </Tarjeta>
   )
@@ -285,13 +269,13 @@ function BloqueObraArea({ area, data }: { area: Area; data: AreaResumen }) {
         <span className="text-[28px] font-bold leading-none tabular-nums">{total}</span>
         <span className="text-[13px] text-muted-foreground">{pl(total, 'hallazgo', 'hallazgos')}</span>
       </div>
-      <BarraApilada items={data.hallazgos} />
+      <BarraApilada area={area} items={data.hallazgos} />
       {total ? (
         <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {data.hallazgos.map((c, i) =>
             c.n ? (
               <li key={c.codigo} className="flex items-center gap-1.5">
-                <i className="size-2 rounded-full" style={{ background: colorDe(c, i) }} />
+                <i className="size-2 rounded-full" style={{ background: colorDe(area, c, i) }} />
                 {c.nombre} <b className="font-semibold text-foreground tabular-nums">{c.n}</b>
               </li>
             ) : null
@@ -419,15 +403,10 @@ export default function DashboardPage() {
                   ) : null}
                 </Tarjeta>
                 {d.tecnica ? (
-                  <KpiArea area="TECNICA" titulo="Visitas técnicas" subtitulo="Hallazgos por tipo" data={d.tecnica} />
+                  <KpiArea area="TECNICA" titulo="Visitas Técnicas" data={d.tecnica} />
                 ) : null}
                 {d.prevencion ? (
-                  <KpiArea
-                    area="PREVENCION"
-                    titulo="Visitas de prevención"
-                    subtitulo="Hallazgos por nivel de riesgo"
-                    data={d.prevencion}
-                  />
+                  <KpiArea area="PREVENCION" titulo="Visitas de Prevención" data={d.prevencion} />
                 ) : null}
               </section>
 
