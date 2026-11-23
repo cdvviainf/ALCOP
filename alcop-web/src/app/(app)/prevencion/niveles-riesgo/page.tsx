@@ -66,7 +66,7 @@ export default function NivelesRiesgoPage() {
   return (
     <>
       <BreadcrumbBar backHref="/obras" trail="Prevención" current="Niveles de riesgo" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <CrudMaintainer<NivelRiesgo, FormValues>
           titulo="Niveles de riesgo"
           descripcion="Severidad de los hallazgos de prevención (Alto, Medio, Observación…)."

@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { z } from 'zod'
 import { Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { TarjetasMovil } from '@/components/shared/tarjetas-movil'
 import { toast } from 'sonner'
 
 import { api } from '@/lib/api'
@@ -267,7 +268,16 @@ export function CrudMaintainer<T extends { id: string | number }, TForm extends 
         />
       </div>
 
-      <div className="rounded-xl border border-border bg-card">
+      <TarjetasMovil
+        columns={columnasFinales}
+        rows={rows}
+        rowKey={(r) => r.id}
+        isLoading={isLoading}
+        isError={isError}
+        emptyMessage={emptyMessage}
+      />
+
+      <div className="hidden rounded-xl border border-border bg-card md:block">
         <Table>
           <TableHeader>
             <TableRow>

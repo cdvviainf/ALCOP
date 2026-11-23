@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { api } from '@/lib/api'
 import { cn } from 'cn'
 import { TopBar } from '@/components/layout/top-bar'
+import { TarjetasMovil, type ColumnaTarjeta } from '@/components/shared/tarjetas-movil'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -109,10 +110,76 @@ export default function ProcedimientosPage() {
     onError: (err: Error) => toast.error(err.message || 'No se pudo eliminar.'),
   })
 
+
+  type Fila = (typeof rows)[number]
+  const estadoFila = (row: Fila) => (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
+        !row.activo
+          ? 'bg-secondary text-foreground'
+          : row.vigente
+            ? 'bg-ok-bg text-ok-fg'
+            : 'bg-warn-bg text-warn-fg'
+      )}
+    >
+      {!row.activo ? 'INACTIVO' : row.vigente ? 'VIGENTE' : 'NO VIGENTE'}
+    </span>
+  )
+  const accionesFila = (row: Fila) => (
+    <div className="flex justify-end gap-1">
+      <Button
+        variant="outline"
+        size="sm"
+        aria-label="Formularios"
+        onClick={() => setGestionando(row)}
+      >
+        <Link2 className="size-4" />
+        Formularios
+      </Button>
+      {puedeEditar ? (
+        <>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Editar"
+            onClick={() => setDialog({ mode: 'editar', row })}
+          >
+            <Pencil />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Eliminar"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setEliminando(row)}
+          >
+            <Trash2 />
+          </Button>
+        </>
+      ) : null}
+    </div>
+  )
+  const columnasMovil: ColumnaTarjeta<Fila>[] = [
+    { key: 'nombre', header: 'Procedimiento', render: (r) => r.nombre },
+    { key: 'codigo', header: 'Código', render: (r) => <span className="font-mono text-xs">{r.codigo}</span> },
+    { key: 'vigencia', header: 'Vigencia', render: (r) => `${fecha(r.vigenciaDesde)} → ${fecha(r.vigenciaHasta)}` },
+    { key: 'estado', header: 'Estado', render: estadoFila },
+    {
+      key: 'pdf',
+      header: 'PDF',
+      render: (r) => (
+        <a href={r.archivoUrl} target="_blank" rel="noreferrer" className="text-primary underline">
+          Ver PDF
+        </a>
+      ),
+    },
+    { key: 'acciones', header: 'Acciones', render: accionesFila },
+  ]
   return (
     <>
       <TopBar />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <div className="space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
@@ -140,7 +207,16 @@ export default function ProcedimientosPage() {
             />
           </div>
 
-          <div className="rounded-xl border border-border bg-card">
+          <TarjetasMovil
+            columns={columnasMovil}
+            rows={rows}
+            rowKey={(r) => r.id}
+            isLoading={isLoading}
+            isError={isError}
+            emptyMessage="No hay procedimientos."
+          />
+
+          <div className="hidden rounded-xl border border-border bg-card md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -182,20 +258,7 @@ export default function ProcedimientosPage() {
                       <TableCell className="text-sm text-muted-foreground">
                         {fecha(row.vigenciaDesde)} → {fecha(row.vigenciaHasta)}
                       </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
-                            !row.activo
-                              ? 'bg-secondary text-foreground'
-                              : row.vigente
-                                ? 'bg-ok-bg text-ok-fg'
-                                : 'bg-warn-bg text-warn-fg'
-                          )}
-                        >
-                          {!row.activo ? 'INACTIVO' : row.vigente ? 'VIGENTE' : 'NO VIGENTE'}
-                        </span>
-                      </TableCell>
+                      <TableCell>{estadoFila(row)}</TableCell>
                       <TableCell>
                         <a
                           href={row.archivoUrl}
@@ -207,40 +270,7 @@ export default function ProcedimientosPage() {
                           Ver PDF
                         </a>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            aria-label="Formularios"
-                            onClick={() => setGestionando(row)}
-                          >
-                            <Link2 className="size-4" />
-                            Formularios
-                          </Button>
-                          {puedeEditar ? (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label="Editar"
-                                onClick={() => setDialog({ mode: 'editar', row })}
-                              >
-                                <Pencil />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label="Eliminar"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => setEliminando(row)}
-                              >
-                                <Trash2 />
-                              </Button>
-                            </>
-                          ) : null}
-                        </div>
-                      </TableCell>
+                      <TableCell>{accionesFila(row)}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -437,7 +467,7 @@ function ProcedimientoFormDialog({
           <Input id="p-nombre" placeholder="Nombre del procedimiento" aria-invalid={errors.nombre ? true : undefined} {...register('nombre')} />
           {errors.nombre?.message ? <p className="text-xs text-destructive">{errors.nombre.message}</p> : null}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="p-desde">Vigencia desde</Label>
             <Input id="p-desde" type="date" aria-invalid={errors.vigenciaDesde ? true : undefined} {...register('vigenciaDesde')} />

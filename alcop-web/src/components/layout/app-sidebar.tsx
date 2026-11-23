@@ -28,6 +28,7 @@ import {
   ListChecks,
   Loader2,
   LogOut,
+  Menu,
   ShieldAlert,
   ShieldCheck,
   Users,
@@ -49,6 +50,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 interface Me {
   id: string
@@ -199,6 +201,8 @@ export function AppSidebar() {
   })
   const [colapsados, setColapsados] = useState<Set<string>>(new Set())
   const [cambioOpen, setCambioOpen] = useState(false)
+  // Menú en pantallas chicas (< md): el aside se oculta y se abre como panel lateral.
+  const [menuMovil, setMenuMovil] = useState(false)
   const [actual, setActual] = useState('')
   const [nueva, setNueva] = useState('')
   const [guardandoPass, setGuardandoPass] = useState(false)
@@ -257,6 +261,7 @@ export function AppSidebar() {
         <li key={n.href}>
           <Link
             href={n.href}
+            onClick={() => setMenuMovil(false)}
             style={padding}
             className={cn(
               'relative flex items-center gap-3 rounded-lg py-2.5 pr-3.5 text-sm transition-colors',
@@ -293,15 +298,19 @@ export function AppSidebar() {
     )
   }
 
-  return (
-    <aside className="hidden w-[260px] shrink-0 flex-col bg-panel md:flex">
+  const marca = (
+    <>
+      <span className="flex items-center justify-center rounded-md border-2 border-primary p-1">
+        <ArrowUp className="size-4 text-primary" strokeWidth={2.5} />
+      </span>
+      <span className="text-sm font-bold tracking-wide text-white">ALCOP TERRENO</span>
+    </>
+  )
+
+  const panel = (
+    <>
       {/* Marca */}
-      <div className="flex items-center gap-2.5 px-6 py-6">
-        <span className="flex items-center justify-center rounded-md border-2 border-primary p-1">
-          <ArrowUp className="size-4 text-primary" strokeWidth={2.5} />
-        </span>
-        <span className="text-sm font-bold tracking-wide text-white">ALCOP TERRENO</span>
-      </div>
+      <div className="flex items-center gap-2.5 px-6 py-6">{marca}</div>
 
       {/* Navegación por secciones */}
       <nav className="mt-1 flex-1 overflow-y-auto px-3 pb-4">
@@ -333,7 +342,10 @@ export function AppSidebar() {
           </div>
           <button
             type="button"
-            onClick={() => setCambioOpen(true)}
+            onClick={() => {
+              setMenuMovil(false)
+              setCambioOpen(true)
+            }}
             title="Cambiar contraseña"
             aria-label="Cambiar contraseña"
             className="rounded-md p-1.5 text-panel-muted transition-colors hover:bg-white/5 hover:text-white"
@@ -351,6 +363,33 @@ export function AppSidebar() {
           </button>
         </div>
       </div>
+
+    </>
+  )
+
+  return (
+    <>
+      {/* Móvil: barra superior con el botón de menú */}
+      <div className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-3 bg-panel px-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMenuMovil(true)}
+          aria-label="Abrir menú"
+          className="-ml-1 rounded-md p-1.5 text-white transition-colors hover:bg-white/10"
+        >
+          <Menu className="size-6" />
+        </button>
+        <div className="flex items-center gap-2.5">{marca}</div>
+      </div>
+
+      <aside className="hidden w-[260px] shrink-0 flex-col bg-panel md:flex">{panel}</aside>
+
+      <Sheet open={menuMovil} onOpenChange={setMenuMovil}>
+        <SheetContent side="left" showCloseButton={false} className="w-[280px] max-w-[85vw] gap-0 border-none bg-panel p-0">
+          <SheetTitle className="sr-only">Menú</SheetTitle>
+          {panel}
+        </SheetContent>
+      </Sheet>
 
       {/* Diálogo de cambio de contraseña del usuario de la sesión */}
       <Dialog open={cambioOpen} onOpenChange={(open) => (!open ? setCambioOpen(false) : undefined)}>
@@ -398,6 +437,6 @@ export function AppSidebar() {
           </form>
         </DialogContent>
       </Dialog>
-    </aside>
+    </>
   )
 }

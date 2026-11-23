@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { cn } from 'cn'
 import { TopBar } from '@/components/layout/top-bar'
+import { TarjetasMovil, type ColumnaTarjeta } from '@/components/shared/tarjetas-movil'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -136,10 +137,75 @@ export default function VisitasPrevencionPage() {
 
   const irA = (id: number) => router.push(`/registro/inspeccion-prevencion/${id}`)
 
+
+  type Fila = (typeof rows)[number]
+  const estadoFila = (row: Fila) => (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
+        row.estado === 'FINALIZADA' ? 'bg-ok-bg text-ok-fg' : 'bg-warn-bg text-warn-fg'
+      )}
+    >
+      {row.estado === 'FINALIZADA' ? 'FINALIZADA' : 'EN CURSO'}
+    </span>
+  )
+  const accionesFila = (row: Fila) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label="Acciones">
+            <MoreVertical />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => irA(row.id)}>
+          <Search className="size-4" />
+          Ver
+        </DropdownMenuItem>
+        {puedeEditar && row.estado === 'EN_CURSO' ? (
+          <DropdownMenuItem onClick={() => irA(row.id)}>
+            <Pencil className="size-4" />
+            Editar
+          </DropdownMenuItem>
+        ) : null}
+        {row.estado === 'FINALIZADA' ? (
+          <DropdownMenuItem
+            onClick={() => window.open(`/api/prevencion/visitas/${row.id}/reporte.pdf`, '_blank')}
+          >
+            <FileText className="size-4" />
+            Descargar PDF
+          </DropdownMenuItem>
+        ) : null}
+        {puedeEditar ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => setEliminando(row)}>
+              <Trash2 className="size-4" />
+              Eliminar
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+  const columnasMovil: ColumnaTarjeta<Fila>[] = [
+    { key: 'obra', header: 'Obra', render: (r) => `${r.obra.nombre} · ${r.obra.codigo}` },
+    { key: 'fecha', header: 'Fecha', render: (r) => fecha(r.fecha) },
+    {
+      key: 'horario',
+      header: 'Horario',
+      render: (r) => (r.horaInicio || r.horaTermino ? `${r.horaInicio ?? '—'}–${r.horaTermino ?? '—'}` : '—'),
+    },
+    { key: 'inspector', header: 'Inspector', render: (r) => r.usuario.nombre },
+    { key: 'hallazgos', header: 'Hallazgos', render: (r) => r.hallazgos },
+    { key: 'estado', header: 'Estado', render: estadoFila },
+    { key: 'acciones', header: '', render: accionesFila },
+  ]
   return (
     <>
       <TopBar />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <div className="space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
@@ -157,8 +223,8 @@ export default function VisitasPrevencionPage() {
           </div>
 
           {/* Filtros y orden */}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="relative w-full max-w-xs">
+          <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
+            <div className="relative w-full sm:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
@@ -180,7 +246,7 @@ export default function VisitasPrevencionPage() {
                 }}
                 items={{ [TODOS]: 'Todas', ...Object.fromEntries(obras.map((o) => [String(o.id), o.nombre])) }}
               >
-                <SelectTrigger className="h-10 w-48">
+                <SelectTrigger className="h-10 w-full sm:w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -205,7 +271,7 @@ export default function VisitasPrevencionPage() {
                 }}
                 items={{ [TODOS]: 'Todos', ...Object.fromEntries(inspectores.map((i) => [i.id, i.nombre])) }}
               >
-                <SelectTrigger className="h-10 w-48">
+                <SelectTrigger className="h-10 w-full sm:w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -231,7 +297,7 @@ export default function VisitasPrevencionPage() {
                   }}
                   items={Object.fromEntries(ORDENES.map((o) => [o.value, o.label]))}
                 >
-                  <SelectTrigger className="h-10 w-36">
+                  <SelectTrigger className="h-10 flex-1 sm:w-36 sm:flex-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -245,7 +311,7 @@ export default function VisitasPrevencionPage() {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-10"
+                  className="size-10"
                   aria-label={dir === 'asc' ? 'Ascendente' : 'Descendente'}
                   title={dir === 'asc' ? 'Ascendente' : 'Descendente'}
                   onClick={() => {
@@ -259,7 +325,17 @@ export default function VisitasPrevencionPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-card">
+          <TarjetasMovil
+            columns={columnasMovil}
+            rows={rows}
+            rowKey={(r) => r.id}
+            isLoading={isLoading}
+            isError={isError}
+            emptyMessage="No hay visitas."
+            onRowClick={(r) => irA(r.id)}
+          />
+
+          <div className="hidden rounded-xl border border-border bg-card md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -306,55 +382,9 @@ export default function VisitasPrevencionPage() {
                         {row.horaInicio || row.horaTermino ? `${row.horaInicio ?? '—'}–${row.horaTermino ?? '—'}` : '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{row.hallazgos}</TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
-                            row.estado === 'FINALIZADA' ? 'bg-ok-bg text-ok-fg' : 'bg-warn-bg text-warn-fg'
-                          )}
-                        >
-                          {row.estado === 'FINALIZADA' ? 'FINALIZADA' : 'EN CURSO'}
-                        </span>
-                      </TableCell>
+                      <TableCell>{estadoFila(row)}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button variant="ghost" size="icon-sm" aria-label="Acciones">
-                                <MoreVertical />
-                              </Button>
-                            }
-                          />
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => irA(row.id)}>
-                              <Search className="size-4" />
-                              Ver
-                            </DropdownMenuItem>
-                            {puedeEditar && row.estado === 'EN_CURSO' ? (
-                              <DropdownMenuItem onClick={() => irA(row.id)}>
-                                <Pencil className="size-4" />
-                                Editar
-                              </DropdownMenuItem>
-                            ) : null}
-                            {row.estado === 'FINALIZADA' ? (
-                              <DropdownMenuItem
-                                onClick={() => window.open(`/api/prevencion/visitas/${row.id}/reporte.pdf`, '_blank')}
-                              >
-                                <FileText className="size-4" />
-                                Descargar PDF
-                              </DropdownMenuItem>
-                            ) : null}
-                            {puedeEditar ? (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive" onClick={() => setEliminando(row)}>
-                                  <Trash2 className="size-4" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </>
-                            ) : null}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {accionesFila(row)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -468,8 +498,8 @@ function NuevaVisitaDialog({ onCreada, onCancel }: { onCreada: (id: number) => v
             </SelectContent>
           </Select>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="col-span-2 space-y-1.5 sm:col-span-1">
             <Label htmlFor="v-fecha">Fecha</Label>
             <Input id="v-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </div>

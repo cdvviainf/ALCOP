@@ -1,3 +1,4 @@
+import { TarjetasMovil } from "@/components/shared/tarjetas-movil";
 import {
   Table,
   TableBody,
@@ -5,18 +6,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from "@/components/ui/table";
 
 export interface Column<T> {
-  key: string
-  header: string
-  render?: (row: T) => React.ReactNode
+  key: string;
+  header: string;
+  render?: (row: T) => React.ReactNode;
 }
 
 interface DataTableProps<T> {
-  columns: Column<T>[]
-  data: T[]
-  emptyMessage?: string
+  columns: Column<T>[];
+  data: T[];
+  emptyMessage?: string;
 }
 
 /**
@@ -26,41 +27,51 @@ interface DataTableProps<T> {
 export function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
-  emptyMessage = 'Sin registros.',
+  emptyMessage = "Sin registros.",
 }: DataTableProps<T>) {
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((col) => (
-              <TableHead key={col.key}>{col.header}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
+    <>
+      <TarjetasMovil
+        columns={columns}
+        rows={data}
+        rowKey={(r) => data.indexOf(r)}
+        emptyMessage={emptyMessage}
+      />
+      <div className="hidden rounded-md border md:block">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="h-24 text-center text-muted-foreground"
-              >
-                {emptyMessage}
-              </TableCell>
+              {columns.map((col) => (
+                <TableHead key={col.key}>{col.header}</TableHead>
+              ))}
             </TableRow>
-          ) : (
-            data.map((row, i) => (
-              <TableRow key={i}>
-                {columns.map((col) => (
-                  <TableCell key={col.key}>
-                    {col.render ? col.render(row) : String(row[col.key] ?? '')}
-                  </TableCell>
-                ))}
+          </TableHeader>
+          <TableBody>
+            {data.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  {emptyMessage}
+                </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  )
+            ) : (
+              data.map((row, i) => (
+                <TableRow key={i}>
+                  {columns.map((col) => (
+                    <TableCell key={col.key}>
+                      {col.render
+                        ? col.render(row)
+                        : String(row[col.key] ?? "")}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  );
 }

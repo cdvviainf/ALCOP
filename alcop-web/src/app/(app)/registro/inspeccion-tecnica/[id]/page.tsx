@@ -133,7 +133,7 @@ export default function VisitaDetallePage({ params }: { params: Promise<{ id: st
     return (
       <>
         <BreadcrumbBar backHref="/registro/inspeccion-tecnica" trail="Visita Técnica" current="…" />
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-4 sm:p-8">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
             Cargando…
@@ -146,7 +146,7 @@ export default function VisitaDetallePage({ params }: { params: Promise<{ id: st
     return (
       <>
         <BreadcrumbBar backHref="/registro/inspeccion-tecnica" trail="Visita Técnica" current="Error" />
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-4 sm:p-8">
           <p className="text-sm text-destructive">No se pudo cargar la visita.</p>
         </main>
       </>
@@ -156,7 +156,7 @@ export default function VisitaDetallePage({ params }: { params: Promise<{ id: st
   return (
     <>
       <BreadcrumbBar backHref="/registro/inspeccion-tecnica" trail="Visita Técnica" current={visita.obra.nombre} />
-      <main className="flex-1 space-y-6 p-8">
+      <main className="flex-1 space-y-6 p-4 sm:p-8">
         {/* Encabezado */}
         <div className="rounded-xl border border-border bg-card p-6">
           <div className="flex items-start justify-between gap-4">
@@ -715,8 +715,8 @@ function EditarVisitaDialog({
       <DialogHeader>
         <DialogTitle>Editar datos de la visita</DialogTitle>
       </DialogHeader>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="space-y-1.5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="col-span-2 space-y-1.5 sm:col-span-1">
           <Label htmlFor="e-fecha">Fecha</Label>
           <Input id="e-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </div>

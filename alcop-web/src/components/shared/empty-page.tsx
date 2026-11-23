@@ -15,7 +15,7 @@ export function EmptyPage({
   return (
     <>
       <TopBar />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <h1 className="text-2xl font-bold text-foreground">{title}</h1>
         {description ? (
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>

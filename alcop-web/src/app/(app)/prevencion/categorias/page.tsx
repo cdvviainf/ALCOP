@@ -7,7 +7,7 @@ export default function CategoriasPrevencionPage() {
   return (
     <>
       <BreadcrumbBar backHref="/obras" trail="Datos Maestros · Prevención" current="Categorías" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <CategoriasMaintainer
           area="PREVENCION"
           descripcion="Clasificación de los hallazgos de las visitas de prevención (categoría › subcategoría)."

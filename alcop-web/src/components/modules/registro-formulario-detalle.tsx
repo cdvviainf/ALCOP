@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PreguntaTexto } from '@/components/shared/pregunta-texto'
 import {
   Dialog,
   DialogContent,
@@ -179,7 +180,7 @@ export function RegistroFormularioDetalle({ registroId, config }: { registroId: 
     return (
       <>
         <TopBar />
-        <main className="flex-1 p-8 text-sm text-muted-foreground">
+        <main className="flex-1 p-4 text-sm sm:p-8 text-muted-foreground">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="size-4 animate-spin" /> Cargando…
           </span>
@@ -191,7 +192,7 @@ export function RegistroFormularioDetalle({ registroId, config }: { registroId: 
     return (
       <>
         <TopBar />
-        <main className="flex-1 p-8 text-sm text-destructive">No se pudo cargar el registro.</main>
+        <main className="flex-1 p-4 text-sm sm:p-8 text-destructive">No se pudo cargar el registro.</main>
       </>
     )
   }
@@ -199,9 +200,9 @@ export function RegistroFormularioDetalle({ registroId, config }: { registroId: 
   return (
     <>
       <TopBar />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <div className="mx-auto max-w-3xl space-y-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <Button variant="ghost" size="sm" className="-ml-2" onClick={() => router.push(config.listHref)}>
                 <ArrowLeft className="size-4" /> Volver
@@ -213,7 +214,11 @@ export function RegistroFormularioDetalle({ registroId, config }: { registroId: 
               </p>
             </div>
             {reg.cerrado ? (
-              <Button variant="outline" onClick={() => window.open(`/api/${apiBase}/${fpId}/reporte.pdf`, '_blank')}>
+              <Button
+                variant="outline"
+                className="self-start sm:self-auto"
+                onClick={() => window.open(`/api/${apiBase}/${fpId}/reporte.pdf`, '_blank')}
+              >
                 <FileText className="size-4" /> PDF
               </Button>
             ) : null}
@@ -346,9 +351,9 @@ function PreguntaCard({
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-2 flex items-start gap-2">
-        <span className="mt-0.5 text-sm font-semibold text-muted-foreground">{index}.</span>
+        <span className="mt-0.5 w-6 shrink-0 text-sm font-semibold text-muted-foreground">{index}.</span>
         <p className="flex-1 text-sm font-medium text-foreground">
-          {pregunta.texto}
+          <PreguntaTexto texto={pregunta.texto} />
           {pregunta.obligatoria ? <span className="ml-1 text-destructive">*</span> : null}
         </p>
       </div>
@@ -385,7 +390,8 @@ function PreguntaCard({
                   v.valorCheckbox === opt.value
                     ? 'border-primary bg-primary/10 font-semibold text-primary'
                     : 'border-border text-foreground hover:bg-accent/40',
-                  !editable && 'opacity-60'
+                  // Solo lectura: la opción marcada queda nítida; las demás, atenuadas.
+                  !editable && v.valorCheckbox !== opt.value && 'opacity-40'
                 )}
               >
                 {opt.label}

@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { cn } from 'cn'
 import { TopBar } from '@/components/layout/top-bar'
+import { TarjetasMovil, type ColumnaTarjeta } from '@/components/shared/tarjetas-movil'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -107,10 +108,41 @@ export default function FormulariosPage() {
     onError: (err: Error) => toast.error(err.message || 'No se pudo eliminar.'),
   })
 
+
+  type Fila = (typeof rows)[number]
+  const columnasMovil: ColumnaTarjeta<Fila>[] = [
+    { key: 'nombre', header: 'Formulario', render: (r) => r.nombre },
+    { key: 'codigo', header: 'Código', render: (r) => <span className="font-mono text-xs">{r.codigo}</span> },
+    { key: 'area', header: 'Área', render: (r) => r.areaNombre },
+    { key: 'categoria', header: 'Categoría', render: (r) => r.categoriaNombre },
+    { key: 'preguntas', header: 'Preguntas', render: (r) => r.preguntas },
+    { key: 'estado', header: 'Estado', render: (r) => (r.activo ? 'Activo' : 'Inactivo') },
+    {
+      key: 'acciones',
+      header: '',
+      render: (r) =>
+        puedeEditarArea(r.areaCodigo) ? (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon-sm" aria-label="Editar" onClick={() => router.push(`/formularios/${r.id}`)}>
+              <Pencil />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Eliminar"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setEliminando(r)}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        ) : null,
+    },
+  ]
   return (
     <>
       <TopBar />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <div className="space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
@@ -138,7 +170,16 @@ export default function FormulariosPage() {
             />
           </div>
 
-          <div className="rounded-xl border border-border bg-card">
+          <TarjetasMovil
+            columns={columnasMovil}
+            rows={rows}
+            rowKey={(r) => r.id}
+            isLoading={isLoading}
+            isError={isError}
+            emptyMessage="No hay formularios."
+          />
+
+          <div className="hidden rounded-xl border border-border bg-card md:block">
             <Table>
               <TableHeader>
                 <TableRow>

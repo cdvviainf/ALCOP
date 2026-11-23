@@ -138,7 +138,7 @@ export default function LotesObraPage() {
   return (
     <>
       <BreadcrumbBar backHref="/obras" trail="Configuración" current="Lotes de Obra" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-foreground">Lotes de Obra</h1>
           <p className="text-sm text-muted-foreground">
@@ -146,10 +146,10 @@ export default function LotesObraPage() {
           </p>
         </div>
 
-        <div className="mt-6 max-w-sm space-y-1.5">
+        <div className="mt-6 space-y-1.5 sm:max-w-sm">
           <label className="text-xs font-semibold tracking-[0.12em] text-label">OBRA</label>
           <Select
-            value={selectedObraId != null ? String(selectedObraId) : undefined}
+            value={selectedObraId != null ? String(selectedObraId) : null}
             onValueChange={(v) => v != null && setObraId(Number(v))}
             items={Object.fromEntries(obras.map((o) => [String(o.id), `${o.nombre} · ${o.codigo}`]))}
           >
@@ -223,8 +223,8 @@ export default function LotesObraPage() {
             </div>
 
             {puedeEditar ? (
-              <div className="mt-4 flex items-end gap-2 border-t border-border pt-4">
-                <div className="flex-1 space-y-1.5">
+              <div className="mt-4 grid grid-cols-[1fr_6rem] items-end gap-2 border-t border-border pt-4 sm:flex">
+                <div className="min-w-0 space-y-1.5 sm:flex-1">
                   <label className="text-xs font-semibold tracking-[0.12em] text-label">TIPO DE LOTE</label>
                   <Select
                     value={nuevoTipo}
@@ -253,7 +253,7 @@ export default function LotesObraPage() {
                     className="h-10"
                   />
                 </div>
-                <Button onClick={handleAgregar} disabled={agregar.isPending} className="h-10">
+                <Button onClick={handleAgregar} disabled={agregar.isPending} className="col-span-2 h-10 sm:col-span-1">
                   {agregar.isPending ? <Loader2 className="animate-spin" /> : <Plus strokeWidth={2.5} />}
                   Agregar
                 </Button>

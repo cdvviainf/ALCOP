@@ -61,7 +61,7 @@ export default function TiposHallazgoPage() {
   return (
     <>
       <BreadcrumbBar backHref="/obras" trail="Técnica" current="Tipos de hallazgo" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <CrudMaintainer<TipoHallazgo, FormValues>
           titulo="Tipos de hallazgo"
           descripcion="Clasificación de los hallazgos técnicos (No conformidad, Mejora, Sugerencia)."

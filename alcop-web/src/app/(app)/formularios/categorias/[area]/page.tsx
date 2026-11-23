@@ -18,7 +18,7 @@ export default function CategoriasPorAreaPage() {
   return (
     <>
       <BreadcrumbBar backHref="/formularios" trail={`Datos Maestros · ${entry.label}`} current="Categorías" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <CategoriasMaintainer area={entry.codigo} />
       </main>
     </>

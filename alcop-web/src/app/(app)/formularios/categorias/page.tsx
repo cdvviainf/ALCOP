@@ -7,7 +7,7 @@ export default function CategoriasFormularioPage() {
   return (
     <>
       <BreadcrumbBar backHref="/formularios" trail="Formularios" current="Categorías" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <CategoriasMaintainer />
       </main>
     </>

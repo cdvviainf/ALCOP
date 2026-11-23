@@ -35,10 +35,18 @@ export interface ReporteData {
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
+/** Marcas de revisión en Pregunta.texto: **texto** = negrita, *Rev* = rojo (import MS Forms). */
+function textoPregunta(s: string): string {
+  return esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*Rev\*/g, '<span class="rev">*Rev*</span>')
+}
 function fechaCorta(d: Date): string {
   const [y, m, day] = d.toISOString().slice(0, 10).split('-')
   return `${day}-${m}-${y}`
 }
+
+const CHECKBOX_LABEL: Record<string, string> = { CUMPLE: 'Cumple', NO_CUMPLE: 'No cumple', N_A: 'N.A.' }
 
 type RespuestaRow = NonNullable<ReporteData['respuesta']>['respuestas'][number]
 
@@ -48,7 +56,7 @@ function valorTexto(tipo: TipoRespuesta, r: RespuestaRow | undefined): string {
     case 'NUMERO':
       return r.valorNumero !== null ? esc(String(r.valorNumero)) : '<span class="muted">Sin respuesta.</span>'
     case 'CHECKBOX':
-      return r.valorCheckbox ? esc(r.valorCheckbox) : '<span class="muted">Sin respuesta.</span>'
+      return r.valorCheckbox ? esc(CHECKBOX_LABEL[r.valorCheckbox] ?? r.valorCheckbox) : '<span class="muted">Sin respuesta.</span>'
     case 'SELECCION_MULTIPLE':
       return r.valorSeleccionMultiple.length ? esc(r.valorSeleccionMultiple.join(', ')) : '<span class="muted">Sin respuesta.</span>'
     case 'TEXTO':
@@ -70,7 +78,7 @@ export function construirHtmlReporte(reg: ReporteData): string {
         .map((f) => `<img class="foto" src="data:${f.mimetype};base64,${Buffer.from(f.data!.datos).toString('base64')}" />`)
         .join('')
       return `<div class="item">
-        <p class="preg">${esc(p.texto)}</p>
+        <p class="preg">${textoPregunta(p.texto)}</p>
         <p class="resp">${valorTexto(p.tipoRespuesta, r)}</p>
         ${fotos ? `<div class="fotos">${fotos}</div>` : ''}
       </div>`
@@ -88,7 +96,9 @@ export function construirHtmlReporte(reg: ReporteData): string {
   .meta td { padding: 3px 8px 3px 0; vertical-align: top; }
   .meta td.k { color: #666; width: 140px; font-weight: 600; }
   .item { border: 1px solid #e3e3e3; border-radius: 6px; padding: 8px 10px; margin: 6px 0; page-break-inside: avoid; }
-  .preg { font-weight: 700; margin: 0 0 4px; }
+  .preg { font-weight: 500; margin: 0 0 4px; }
+  .preg strong { font-weight: 800; }
+  .preg .rev { color: #e5484d; font-weight: 700; }
   .resp { margin: 0; white-space: pre-wrap; }
   .fotos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .foto { width: 150px; height: 110px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }

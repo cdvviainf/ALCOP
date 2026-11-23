@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 /** Shell blanco del header — barra superior del área clara (h-16, borde inferior). */
 export function AppHeader({ children }: { children: React.ReactNode }) {
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-white px-8">
+    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-white px-4 sm:px-8">
       {children}
     </header>
   )
@@ -53,17 +53,18 @@ export function BreadcrumbBar({
 }) {
   return (
     <AppHeader>
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex min-w-0 items-center gap-3 text-sm">
         <Link
           href={backHref}
           aria-label="Volver"
-          className="flex size-7 items-center justify-center rounded-md text-foreground transition-colors hover:bg-secondary"
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-secondary"
         >
           <ChevronLeft className="size-5" />
         </Link>
-        <span className="font-semibold text-foreground">{trail}</span>
-        <span className="text-muted-foreground">/</span>
-        <span className="font-bold text-foreground">{current}</span>
+        {/* En el teléfono solo se muestra la página actual (el trail se cortaba en dos líneas). */}
+        <span className="hidden whitespace-nowrap font-semibold text-foreground sm:inline">{trail}</span>
+        <span className="hidden text-muted-foreground sm:inline">/</span>
+        <span className="truncate font-bold text-foreground">{current}</span>
       </div>
     </AppHeader>
   )

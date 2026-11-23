@@ -48,7 +48,7 @@ const NIVEL_ITEMS = Object.fromEntries(NIVELES.map((n) => [n.value, n.label]))
 function NivelSelect({ value, onChange }: { value: Nivel; onChange: (v: Nivel) => void }) {
   return (
     <Select value={value} onValueChange={(v) => v && onChange(v as Nivel)} items={NIVEL_ITEMS}>
-      <SelectTrigger className="h-8 w-40">
+      <SelectTrigger className="h-8 w-36 shrink-0 sm:w-40">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -190,7 +190,7 @@ function AreaCard({
         <div className="mt-4 space-y-3">
           {funciones.map((f) => (
             <div key={f.id} className="flex items-center justify-between gap-4">
-              <span className="text-sm text-foreground">{f.nombre}</span>
+              <span className="min-w-0 flex-1 text-sm text-foreground">{f.nombre}</span>
               <NivelSelect value={niveles[f.id] ?? 'SIN_ACCESO'} onChange={(v) => setNivel(f.id, v)} />
             </div>
           ))}
@@ -223,7 +223,7 @@ export default function PerfilEditorPage() {
   return (
     <>
       <BreadcrumbBar backHref="/usuarios/perfiles" trail="Perfiles" current={esNuevo ? 'Nuevo' : (perfil?.nombre ?? 'Editar')} />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         {cargando || !funcResp ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />

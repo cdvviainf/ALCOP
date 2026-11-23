@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { cn } from 'cn'
 import { TopBar } from '@/components/layout/top-bar'
+import { TarjetasMovil, type ColumnaTarjeta } from '@/components/shared/tarjetas-movil'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -121,10 +122,76 @@ export default function RegistrosPrevencionPage() {
 
   const irA = (id: number) => router.push(`/registro/prevencion/${id}`)
 
+
+  type Fila = (typeof rows)[number]
+  const estadoFila = (row: Fila) => (
+    <>
+      <span
+        className={cn(
+          'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
+          BADGE[row.estado]
+        )}
+      >
+        {LABEL[row.estado]}
+      </span>
+      {row.enProgreso ? (
+        <span className="ml-2 text-[11px] text-muted-foreground">en progreso</span>
+      ) : null}
+    </>
+  )
+  const accionesFila = (row: Fila) => (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon-sm" aria-label="Acciones">
+              <MoreVertical />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end">
+          {row.estado === 'COMPLETADO' ? (
+            <>
+              <DropdownMenuItem onClick={() => irA(row.id)}>
+                <Search className="size-4" />
+                Ver
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => window.open(`/api/prevencion/registros/${row.id}/reporte.pdf`, '_blank')}
+              >
+                <FileText className="size-4" />
+                Descargar PDF
+              </DropdownMenuItem>
+            </>
+          ) : (
+            <>
+              <DropdownMenuItem onClick={() => irA(row.id)}>
+                <Pencil className="size-4" />
+                Editar
+              </DropdownMenuItem>
+              {puedeEditar ? (
+                <DropdownMenuItem onClick={() => setCerrando(row)}>
+                  <Lock className="size-4" />
+                  Cerrar
+                </DropdownMenuItem>
+              ) : null}
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  )
+  const columnasMovil: ColumnaTarjeta<Fila>[] = [
+    { key: 'formulario', header: 'Formulario', render: (r) => `${r.formulario.nombre} · ${r.formulario.codigo}` },
+    { key: 'fecha', header: 'Fecha', render: (r) => r.fecha },
+    { key: 'estado', header: 'Estado', render: estadoFila },
+    { key: 'revision', header: 'Revisión', render: (r) => r.fechaRevision ?? '—' },
+    { key: 'acciones', header: '', render: accionesFila },
+  ]
   return (
     <>
       <TopBar />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <div className="space-y-5">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold text-foreground">Registro Prevención</h1>
@@ -133,11 +200,11 @@ export default function RegistrosPrevencionPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold tracking-wide text-label">OBRA</Label>
               <Select
-                value={obraId !== null ? String(obraId) : undefined}
+                value={obraId !== null ? String(obraId) : null}
                 onValueChange={(v) => {
                   if (typeof v === 'string') {
                     setObraId(Number(v))
@@ -146,7 +213,7 @@ export default function RegistrosPrevencionPage() {
                 }}
                 items={Object.fromEntries(obras.map((o) => [String(o.id), `${o.nombre} · ${o.codigo}`]))}
               >
-                <SelectTrigger className="h-10 w-72">
+                <SelectTrigger className="h-10 w-full sm:w-72">
                   <SelectValue placeholder="Selecciona una obra…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -170,7 +237,7 @@ export default function RegistrosPrevencionPage() {
                 }}
                 items={Object.fromEntries(ESTADOS.map((e) => [e.value, e.label]))}
               >
-                <SelectTrigger className="h-10 w-48">
+                <SelectTrigger className="h-10 w-full sm:w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -189,7 +256,17 @@ export default function RegistrosPrevencionPage() {
               Selecciona una obra para ver sus registros.
             </div>
           ) : (
-            <div className="rounded-xl border border-border bg-card">
+            <>
+            <TarjetasMovil
+              columns={columnasMovil}
+              rows={rows}
+              rowKey={(r) => r.id}
+              isLoading={isLoading}
+              isError={isError}
+              emptyMessage="No hay registros."
+              onRowClick={(r) => irA(r.id)}
+            />
+            <div className="hidden rounded-xl border border-border bg-card md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -229,59 +306,10 @@ export default function RegistrosPrevencionPage() {
                           {row.formulario.nombre}{' '}
                           <span className="text-xs text-muted-foreground">· {row.formulario.codigo}</span>
                         </TableCell>
-                        <TableCell>
-                          <span
-                            className={cn(
-                              'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
-                              BADGE[row.estado]
-                            )}
-                          >
-                            {LABEL[row.estado]}
-                          </span>
-                          {row.enProgreso ? (
-                            <span className="ml-2 text-[11px] text-muted-foreground">en progreso</span>
-                          ) : null}
-                        </TableCell>
+                        <TableCell>{estadoFila(row)}</TableCell>
                         <TableCell className="text-muted-foreground">{row.fechaRevision ?? '—'}</TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button variant="ghost" size="icon-sm" aria-label="Acciones">
-                                  <MoreVertical />
-                                </Button>
-                              }
-                            />
-                            <DropdownMenuContent align="end">
-                              {row.estado === 'COMPLETADO' ? (
-                                <>
-                                  <DropdownMenuItem onClick={() => irA(row.id)}>
-                                    <Search className="size-4" />
-                                    Ver
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => window.open(`/api/prevencion/registros/${row.id}/reporte.pdf`, '_blank')}
-                                  >
-                                    <FileText className="size-4" />
-                                    Descargar PDF
-                                  </DropdownMenuItem>
-                                </>
-                              ) : (
-                                <>
-                                  <DropdownMenuItem onClick={() => irA(row.id)}>
-                                    <Pencil className="size-4" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  {puedeEditar ? (
-                                    <DropdownMenuItem onClick={() => setCerrando(row)}>
-                                      <Lock className="size-4" />
-                                      Cerrar
-                                    </DropdownMenuItem>
-                                  ) : null}
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {accionesFila(row)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -289,6 +317,7 @@ export default function RegistrosPrevencionPage() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
 
           {meta && meta.totalPages > 1 ? (

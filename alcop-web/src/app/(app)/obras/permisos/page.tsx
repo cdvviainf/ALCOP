@@ -115,7 +115,7 @@ export default function PermisosObraPage() {
   return (
     <>
       <BreadcrumbBar backHref="/obras" trail="Accesos" current="Permisos Obra" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-foreground">Permisos Obra</h1>
           <p className="text-sm text-muted-foreground">
@@ -126,7 +126,7 @@ export default function PermisosObraPage() {
         <div className="mt-6 max-w-sm space-y-1.5">
           <label className="text-xs font-semibold tracking-[0.12em] text-label">OBRA</label>
           <Select
-            value={selectedObraId != null ? String(selectedObraId) : undefined}
+            value={selectedObraId != null ? String(selectedObraId) : null}
             onValueChange={(v) => v != null && setObraId(Number(v))}
             items={Object.fromEntries(obras.map((o) => [String(o.id), `${o.nombre} · ${o.codigo}`]))}
           >

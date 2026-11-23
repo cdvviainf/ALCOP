@@ -61,7 +61,7 @@ export default function EtapasConstructivasPage() {
   return (
     <>
       <BreadcrumbBar backHref="/obras" trail="Técnica" current="Etapas constructivas" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <CrudMaintainer<EtapaConstructiva, FormValues>
           titulo="Etapas constructivas"
           descripcion="Etapas de avance de la obra (Obra gruesa, Terminaciones, Urbanización…)."

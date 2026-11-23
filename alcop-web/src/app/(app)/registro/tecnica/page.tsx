@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { cn } from 'cn'
 import { TopBar } from '@/components/layout/top-bar'
+import { TarjetasMovil, type ColumnaTarjeta } from '@/components/shared/tarjetas-movil'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -101,10 +102,54 @@ export default function RegistroTecnicoPage() {
     onError: (err: Error) => toast.error(err.message || 'No se pudo aplicar el formulario.'),
   })
 
+
+  type Fila = (typeof rows)[number]
+  const estadoFila = (row: Fila) => (
+    <>
+      <span
+        className={cn(
+          'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
+          BADGE[row.estado]
+        )}
+      >
+        {LABEL[row.estado]}
+      </span>
+    </>
+  )
+  const accionesFila = (row: Fila) => (
+    <>
+      {row.estado === 'COMPLETADO' ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Descargar PDF"
+          onClick={() => window.open(`/api/tecnica/registros/${row.id}/reporte.pdf`, '_blank')}
+        >
+          <FileText />
+        </Button>
+      ) : null}
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={row.estado === 'EN_PROGRESO' && puedeEditar ? 'Continuar' : 'Ver'}
+        onClick={() => irA(row.id)}
+      >
+        {row.estado === 'EN_PROGRESO' && puedeEditar ? <Pencil /> : <Search />}
+      </Button>
+    </>
+  )
+  const columnasMovil: ColumnaTarjeta<Fila>[] = [
+    { key: 'formulario', header: 'Formulario', render: (r) => `${r.formulario.nombre} · ${r.formulario.codigo}` },
+    { key: 'fecha', header: 'Fecha', render: (r) => r.fecha },
+    { key: 'responsable', header: 'Responsable', render: (r) => r.responsable },
+    { key: 'estado', header: 'Estado', render: estadoFila },
+    { key: 'revision', header: 'Revisión', render: (r) => r.fechaRevision ?? '—' },
+    { key: 'acciones', header: '', render: accionesFila },
+  ]
   return (
     <>
       <TopBar />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <div className="space-y-5">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold text-foreground">Registro Técnica</h1>
@@ -113,11 +158,11 @@ export default function RegistroTecnicoPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
             <div className="space-y-1">
               <Label className="text-[11px] font-semibold tracking-wide text-label">OBRA</Label>
               <Select
-                value={obraId !== null ? String(obraId) : undefined}
+                value={obraId !== null ? String(obraId) : null}
                 onValueChange={(v) => {
                   if (typeof v === 'string') {
                     setObraId(Number(v))
@@ -126,7 +171,7 @@ export default function RegistroTecnicoPage() {
                 }}
                 items={Object.fromEntries(obras.map((o) => [String(o.id), `${o.nombre} · ${o.codigo}`]))}
               >
-                <SelectTrigger className="h-10 w-72">
+                <SelectTrigger className="h-10 w-full sm:w-72">
                   <SelectValue placeholder="Selecciona una obra…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -143,13 +188,13 @@ export default function RegistroTecnicoPage() {
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold tracking-wide text-label">FORMULARIO</Label>
                   <Select
-                    value={formularioId !== null ? String(formularioId) : undefined}
+                    value={formularioId !== null ? String(formularioId) : null}
                     onValueChange={(v) => {
                       if (typeof v === 'string') setFormularioId(Number(v))
                     }}
                     items={Object.fromEntries(formularios.map((f) => [String(f.id), `${f.codigo} · ${f.nombre}`]))}
                   >
-                    <SelectTrigger className="h-10 w-96 max-w-full">
+                    <SelectTrigger className="h-10 w-full sm:w-96">
                       <SelectValue placeholder="Selecciona un formulario…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -162,7 +207,7 @@ export default function RegistroTecnicoPage() {
                   </Select>
                 </div>
                 <Button
-                  className="h-10"
+                  className="h-10 w-full sm:w-auto"
                   disabled={obraId === null || formularioId === null || aplicar.isPending}
                   onClick={() => aplicar.mutate()}
                 >
@@ -203,7 +248,16 @@ export default function RegistroTecnicoPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="rounded-xl border border-border bg-card">
+              <TarjetasMovil
+                columns={columnasMovil}
+                rows={rows}
+                rowKey={(r) => r.id}
+                isLoading={isLoading}
+                isError={isError}
+                emptyMessage="No hay registros."
+                onRowClick={(r) => irA(r.id)}
+              />
+              <div className="hidden rounded-xl border border-border bg-card md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -245,36 +299,10 @@ export default function RegistroTecnicoPage() {
                             <span className="text-xs text-muted-foreground">· {row.formulario.codigo}</span>
                           </TableCell>
                           <TableCell className="text-muted-foreground">{row.responsable}</TableCell>
-                          <TableCell>
-                            <span
-                              className={cn(
-                                'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide',
-                                BADGE[row.estado]
-                              )}
-                            >
-                              {LABEL[row.estado]}
-                            </span>
-                          </TableCell>
+                          <TableCell>{estadoFila(row)}</TableCell>
                           <TableCell className="text-muted-foreground">{row.fechaRevision ?? '—'}</TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            {row.estado === 'COMPLETADO' ? (
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label="Descargar PDF"
-                                onClick={() => window.open(`/api/tecnica/registros/${row.id}/reporte.pdf`, '_blank')}
-                              >
-                                <FileText />
-                              </Button>
-                            ) : null}
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={row.estado === 'EN_PROGRESO' && puedeEditar ? 'Continuar' : 'Ver'}
-                              onClick={() => irA(row.id)}
-                            >
-                              {row.estado === 'EN_PROGRESO' && puedeEditar ? <Pencil /> : <Search />}
-                            </Button>
+                            {accionesFila(row)}
                           </TableCell>
                         </TableRow>
                       ))

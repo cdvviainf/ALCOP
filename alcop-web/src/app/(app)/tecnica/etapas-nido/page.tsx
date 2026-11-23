@@ -61,7 +61,7 @@ export default function EtapasNidoPage() {
   return (
     <>
       <BreadcrumbBar backHref="/obras" trail="Técnica" current="Etapas de nido" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <CrudMaintainer<EtapaNido, FormValues>
           titulo="Etapas de nido"
           descripcion="Las 6 etapas del hito de nido, en orden (Descubierto → Picado → … → Perfilado)."

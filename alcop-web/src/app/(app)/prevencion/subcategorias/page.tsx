@@ -7,7 +7,7 @@ export default function SubcategoriasPrevencionPage() {
   return (
     <>
       <BreadcrumbBar backHref="/obras" trail="Datos Maestros · Prevención" current="Subcategorías" />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-4 sm:p-8">
         <SubcategoriasMaintainer area="PREVENCION" />
       </main>
     </>

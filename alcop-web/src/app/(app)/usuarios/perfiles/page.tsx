@@ -10,6 +10,7 @@ import { api } from '@/lib/api'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { BreadcrumbBar } from '@/components/layout/top-bar'
+import { TarjetasMovil, type ColumnaTarjeta } from '@/components/shared/tarjetas-movil'
 import {
   Table,
   TableBody,
@@ -68,11 +69,42 @@ export default function PerfilesPage() {
     onError: (err: Error) => toast.error(err.message || 'No se pudo eliminar.'),
   })
 
+
+  type Fila = (typeof perfiles)[number]
+  const accionesFila = (p: Fila) => (
+    <div className="flex justify-end gap-1">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Editar"
+        render={<Link href={`/usuarios/perfiles/${p.id}`} />}
+        nativeButton={false}
+      >
+        <Pencil />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Eliminar"
+        className="text-destructive hover:text-destructive"
+        onClick={() => setEliminando(p)}
+      >
+        <Trash2 />
+      </Button>
+    </div>
+  )
+  const columnasMovil: ColumnaTarjeta<Fila>[] = [
+    { key: 'nombre', header: 'Perfil', render: (p) => p.nombre },
+    { key: 'prev', header: 'Prevención', render: (p) => <AreaBadge on={p.areaPrevencion} /> },
+    { key: 'tec', header: 'Técnica', render: (p) => <AreaBadge on={p.areaTecnica} /> },
+    { key: 'usuarios', header: 'Usuarios', render: (p) => p.usuariosActivos },
+    { key: 'acciones', header: '', render: accionesFila },
+  ]
   return (
     <>
       <BreadcrumbBar backHref="/usuarios" trail="Accesos" current="Perfiles" />
-      <main className="flex-1 p-8">
-        <div className="flex items-center justify-between">
+      <main className="flex-1 p-4 sm:p-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold text-foreground">Perfiles</h1>
             <p className="text-sm text-muted-foreground">
@@ -85,7 +117,18 @@ export default function PerfilesPage() {
           </Button>
         </div>
 
-        <div className="mt-6 rounded-xl border border-border bg-card">
+        <div className="mt-6 md:hidden">
+          <TarjetasMovil
+            columns={columnasMovil}
+            rows={perfiles}
+            rowKey={(p) => p.id}
+            isLoading={isLoading}
+            isError={isError}
+            emptyMessage="No hay perfiles."
+          />
+        </div>
+
+        <div className="mt-6 hidden rounded-xl border border-border bg-card md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -129,28 +172,7 @@ export default function PerfilesPage() {
                       <AreaBadge on={p.areaTecnica} />
                     </TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">{p.usuariosActivos}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Editar"
-                          render={<Link href={`/usuarios/perfiles/${p.id}`} />}
-                          nativeButton={false}
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Eliminar"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setEliminando(p)}
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    <TableCell>{accionesFila(p)}</TableCell>
                   </TableRow>
                 ))
               )}

@@ -14,6 +14,7 @@ import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PreguntaTexto } from '@/components/shared/pregunta-texto'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
@@ -399,7 +400,7 @@ export function FormularioBuilder({
             {preguntas?.map((p, i) => (
               <div key={i} className="rounded-lg border border-border bg-card px-4 py-3">
                 <div className="text-sm font-medium text-foreground">
-                  #{i + 1} · {p.texto}
+                  #{i + 1} · <PreguntaTexto texto={p.texto} />
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {TIPOS.find((t) => t.value === p.tipoRespuesta)?.label ?? p.tipoRespuesta}
@@ -416,14 +417,15 @@ export function FormularioBuilder({
             const errP = errors.preguntas?.[i]
             return (
               <div key={f.id} className="space-y-3 rounded-xl border border-border bg-card p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="mt-2 text-xs font-semibold text-label">#{i + 1}</span>
-                  <div className="flex-1 space-y-1.5">
+                {/* Móvil: #N y botones arriba, el campo debajo a todo el ancho. */}
+                <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 sm:flex-nowrap">
+                  <span className="order-1 mt-2 text-xs font-semibold text-label">#{i + 1}</span>
+                  <div className="order-3 w-full space-y-1.5 sm:order-2 sm:w-auto sm:flex-1">
                     <Label htmlFor={`p-${i}-texto`}>Pregunta</Label>
                     <Input id={`p-${i}-texto`} placeholder="Texto del punto de chequeo" {...register(`preguntas.${i}.texto`)} />
                     {errP?.texto?.message ? <p className="text-xs text-destructive">{errP.texto.message}</p> : null}
                   </div>
-                  <div className="mt-6 flex gap-1">
+                  <div className="order-2 flex gap-1 sm:order-3 sm:mt-6">
                     <Button type="button" variant="ghost" size="icon-sm" aria-label="Subir" disabled={i === 0} onClick={() => move(i, i - 1)}>
                       <ArrowUp />
                     </Button>
