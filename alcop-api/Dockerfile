@@ -2,7 +2,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache openssl
-COPY package*.json ./
+COPY package*.json .npmrc ./
 # NODE_ENV=development para que npm instale devDependencies (typescript, tsx, etc.)
 # --ignore-scripts evita que @prisma/client postinstall dispare prisma generate sin schema
 RUN NODE_ENV=development npm ci --ignore-scripts
@@ -35,7 +35,7 @@ RUN apk add --no-cache \
       ca-certificates \
       ttf-freefont
 ENV PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium-browser
-COPY package*.json ./
+COPY package*.json .npmrc ./
 # --ignore-scripts evita el postinstall de @prisma/client; el cliente ya viene copiado del builder
 RUN npm ci --omit=dev --ignore-scripts
 COPY prisma ./prisma

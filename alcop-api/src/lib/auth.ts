@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
+import { expo } from '@better-auth/expo'
 import { env } from '../config/env.js'
 import { prisma } from './prisma.js'
 
@@ -15,7 +16,14 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
   },
-  trustedOrigins: env.CORS_ORIGIN.split(','),
+  // App móvil (Docs/app-movil.md): el plugin expo() acepta el origen de la app
+  // nativa (esquema alcop://). En desarrollo también Expo Go (exp://).
+  plugins: [expo()],
+  trustedOrigins: [
+    ...env.CORS_ORIGIN.split(','),
+    'alcop://',
+    ...(env.NODE_ENV === 'development' ? ['exp://', 'exp://**'] : []),
+  ],
   databaseHooks: {
     session: {
       create: {
