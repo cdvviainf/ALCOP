@@ -27,7 +27,7 @@ interface ObraOpcion {
 // Color sigue a la entidad (validado: CVD ΔE 23.4, contraste ≥ 3:1 sobre blanco).
 const SERIES = [
   { key: 'tecnica', nombre: 'Técnica', color: '#0284c7' },
-  { key: 'prevencion', nombre: 'Prevención', color: '#e8560f' },
+  { key: 'prevencion', nombre: 'Prevención', color: '#e0441b' },
 ] as const
 
 const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']

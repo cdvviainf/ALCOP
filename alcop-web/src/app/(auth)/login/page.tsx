@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowUp } from 'lucide-react'
 
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
@@ -18,17 +18,6 @@ const loginSchema = z.object({
 })
 
 type LoginForm = z.infer<typeof loginSchema>
-
-/** Marca ALCOP: casa/flecha-arriba en trazo naranja + wordmark. */
-function BrandMark({ className }: { className?: string }) {
-  return (
-    <span className={className}>
-      <span className="flex items-center justify-center rounded-md border-2 border-primary p-1.5">
-        <ArrowUp className="size-5 text-primary" strokeWidth={2.5} />
-      </span>
-    </span>
-  )
-}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -73,53 +62,38 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-svh">
-      {/* Panel izquierdo oscuro — oculto en móvil */}
-      <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-panel p-12 text-white lg:flex">
-        {/* Marca de agua: contorno de casa muy tenue */}
-        <svg
-          aria-hidden
-          viewBox="0 0 400 400"
-          className="pointer-events-none absolute -top-10 left-1/2 w-[120%] -translate-x-1/2 text-white/[0.03]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M40 200 L200 60 L360 200" />
-          <path d="M90 190 L90 360 L310 360 L310 190" />
-        </svg>
-
-        <div className="relative z-10 flex items-center gap-3">
-          <BrandMark />
-          <div className="leading-tight">
-            <div className="text-xl font-bold tracking-wide text-white">ALCOP</div>
-            <div className="text-[11px] font-medium tracking-[0.18em] text-label">
-              CONSTRUCTORA E INMOBILIARIA
-            </div>
-          </div>
-        </div>
-
-        <div className="relative z-10 max-w-md">
-          <h1 className="text-4xl font-bold leading-tight text-white">
-            Sistema de Inspección en Terreno
-          </h1>
-          <p className="mt-5 text-base leading-relaxed text-panel-item">
-            Prevención de riesgos e inspección de obra, centralizadas por proyecto.
+      {/* Panel izquierdo oscuro — oculto en móvil. Logo vertical naranja + blanco
+          (propuesta de gráfica, dirección A). */}
+      <aside className="hidden w-1/2 flex-col items-center justify-between bg-panel p-12 text-white lg:flex">
+        <div />
+        <div className="flex flex-col items-center text-center">
+          <Image
+            src="/marca/logo-vertical-blanco.png"
+            alt="ALCOP Constructora"
+            width={800}
+            height={424}
+            priority
+            className="h-auto w-[300px]"
+          />
+          <p className="mt-10 max-w-sm text-base leading-relaxed text-panel-item">
+            Sistema de inspección en terreno: prevención de riesgos e inspección técnica, centralizadas por obra.
           </p>
         </div>
-
-        <p className="relative z-10 text-sm text-panel-muted">
-          © 2026 ALCOP Constructora e Inmobiliaria
-        </p>
+        <p className="text-sm text-panel-muted">© 2026 ALCOP Constructora e Inmobiliaria</p>
       </aside>
 
       {/* Panel derecho — formulario */}
       <main className="flex w-full items-center justify-center bg-white px-6 py-12 lg:w-1/2">
         <div className="w-full max-w-md">
           {/* Marca compacta visible solo en móvil */}
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <BrandMark />
-            <div className="text-lg font-bold tracking-wide text-foreground">ALCOP</div>
-          </div>
+          <Image
+            src="/marca/logo-horizontal-negro.png"
+            alt="ALCOP Constructora"
+            width={800}
+            height={131}
+            priority
+            className="mb-10 h-auto w-[180px] lg:hidden"
+          />
 
           <p className="text-xs font-semibold tracking-[0.18em] text-primary">
             ACCESO AL SISTEMA

@@ -68,7 +68,7 @@
   --panel-item: #b5b5b0;     /* texto de items inactivos */
   --panel-muted: #6f6f6a;    /* íconos atenuados / caption gris sobre oscuro */
   --label: #9a9a95;          /* labels pequeñas en mayúsculas */
-  --primary-hover: #cc4a0c;  /* naranja hover/activo */
+  --primary-hover: #c03a17;  /* naranja hover/activo */
   --ok-bg: #e6f4ea;          /* badge AL DÍA */
   --ok-fg: #1e7b34;
   --warn-bg: #fce9dd;        /* badge PENDIENTE */
@@ -80,7 +80,7 @@
   --card-foreground: #1a1a1a;
   --popover: #ffffff;
   --popover-foreground: #1a1a1a;
-  --primary: #e8560f;
+  --primary: #e0441b;
   --primary-foreground: #ffffff;
   --secondary: #f4f3f1;
   --secondary-foreground: #1a1a1a;
@@ -91,7 +91,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: #e7e5e3;
   --input: #e7e5e3;
-  --ring: #e8560f;
+  --ring: #e0441b;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

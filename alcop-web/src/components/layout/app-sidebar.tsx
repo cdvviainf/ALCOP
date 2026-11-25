@@ -1,11 +1,11 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowUp,
   Blocks,
   Boxes,
   Building2,
@@ -62,7 +62,7 @@ interface Me {
 }
 
 /**
- * Sidebar oscuro de ALCOP TERRENO, en secciones con grupos anidados colapsables.
+ * Sidebar oscuro de ALCOP (logo horizontal naranja + blanco), en secciones con grupos anidados colapsables.
  *
  * Visibilidad (modelo granular v2, usuarios-perfiles.md §6): cada hoja declara
  * `requiere` y se filtra según el acceso del usuario (GET /api/usuarios/me):
@@ -298,19 +298,22 @@ export function AppSidebar() {
     )
   }
 
+  // Logo oficial horizontal naranja + blanco (propuesta de gráfica, dirección A).
   const marca = (
-    <>
-      <span className="flex items-center justify-center rounded-md border-2 border-primary p-1">
-        <ArrowUp className="size-4 text-primary" strokeWidth={2.5} />
-      </span>
-      <span className="text-sm font-bold tracking-wide text-white">ALCOP TERRENO</span>
-    </>
+    <Image
+      src="/marca/logo-horizontal-blanco.png"
+      alt="ALCOP Constructora"
+      width={800}
+      height={131}
+      priority
+      className="h-auto w-[150px]"
+    />
   )
 
   const panel = (
     <>
       {/* Marca */}
-      <div className="flex items-center gap-2.5 px-6 py-6">{marca}</div>
+      <div className="flex items-center px-6 py-6">{marca}</div>
 
       {/* Navegación por secciones */}
       <nav className="mt-1 flex-1 overflow-y-auto px-3 pb-4">
@@ -379,7 +382,7 @@ export function AppSidebar() {
         >
           <Menu className="size-6" />
         </button>
-        <div className="flex items-center gap-2.5">{marca}</div>
+        <div className="flex items-center [&_img]:w-[132px]">{marca}</div>
       </div>
 
       <aside className="hidden w-[260px] shrink-0 flex-col bg-panel md:flex">{panel}</aside>

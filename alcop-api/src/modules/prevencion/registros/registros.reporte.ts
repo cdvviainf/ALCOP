@@ -1,4 +1,5 @@
 import type { Prisma, TipoRespuesta } from '@prisma/client'
+import { CSS_ENCABEZADO, encabezadoReporte } from '../../../shared/marca.js'
 
 /** Datos que consume el reporte (compartido por Registro Prevención y Técnico). */
 export interface ReporteData {
@@ -86,11 +87,11 @@ export function construirHtmlReporte(reg: ReporteData): string {
     .join('')
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8" />
-<style>
+<style>${CSS_ENCABEZADO}
   * { box-sizing: border-box; }
   body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; font-size: 12px; margin: 0; }
   h1 { font-size: 20px; margin: 0 0 4px; }
-  h2 { font-size: 14px; margin: 22px 0 8px; border-bottom: 2px solid #e5484d; padding-bottom: 4px; color: #e5484d; }
+  h2 { font-size: 14px; margin: 22px 0 8px; border-bottom: 2px solid #e0441b; padding-bottom: 4px; color: #e0441b; }
   .muted { color: #888; }
   .meta { width: 100%; border-collapse: collapse; margin-top: 6px; }
   .meta td { padding: 3px 8px 3px 0; vertical-align: top; }
@@ -104,6 +105,7 @@ export function construirHtmlReporte(reg: ReporteData): string {
   .foto { width: 150px; height: 110px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
   .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #eee; }
 </style></head><body>
+  ${encabezadoReporte('Registro de formulario')}
   <h1>Registro de Formulario</h1>
   <span class="badge">COMPLETADO</span>
   <table class="meta">
