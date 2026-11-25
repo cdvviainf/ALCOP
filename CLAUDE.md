@@ -44,11 +44,11 @@ Convenciones conservadas: tablas server-side (search/filter/paginación) con Tan
 - El flujo es igual en Prevención y Técnica: fotos → adaptador IA → informe en el formato fijo (Obra, Inspector, Fecha y hora, Ubicación, Imágenes, Observaciones) → editable por el usuario antes de guardar como reporte definitivo.
 - En desarrollo, usar `AI_PROVIDER=mock` (respuestas dummy) hasta tener la cuenta/API key de Gemini de ALCOP.
 
-### Decisión canónica — Etapa 2 (App móvil) en stand by
+### Decisión canónica — Etapa 2 (App móvil) ACTIVA (12-11-2026)
 
-- Christian pidió (04-10-2026) dejar la **definición técnica** de la app móvil nativa en stand by — no especificar módulos, pantallas ni modelo de datos de Etapa 2 todavía.
-- Esto NO afecta lo ya comprometido comercialmente con ALCOP (145 UF totales, Etapa 2 = 63 UF, Gantt de la sección 09 de `alcop-esquema.html`) — es solo una pausa en el trabajo de especificación técnica hasta que Etapa 1 esté más avanzada.
-- Mientras esté en stand by: no crear `Docs/app-movil.md`, no iniciar `alcop-mobile/`.
+- Christian levantó el stand by el 12-11-2026 (OK del cliente a la Etapa 1; quedan pendientes ajustes de Dashboard y PDF en la web).
+- Spec: `Docs/app-movil.md` (v0.1). Stack: **Expo (React Native) + TypeScript + expo-router**, Better Auth con `@better-auth/expo`, TanStack Query + ky v1, `expo-notifications` (Expo Push). Builds y publicación con **EAS**.
+- Repo/carpeta: `alcop-mobile/`. La app es otro cliente de `alcop-api` (mismos permisos y alcance por obra); la configuración sigue solo en la web.
 
 ---
 
@@ -225,7 +225,7 @@ alcop-web/
 | `tecnica.md` | Pendiente de spec | VisitaTecnica, HitoEtapa (nidos/puntales), AnalisisIA |
 | `reportes.md` | Pendiente de spec | Reporte (PDF generado), vínculo a Formulario/Visita/Hallazgo/AnalisisIA |
 | `alertas.md` | Pendiente de spec | Notificación por obra (Administrador, Jefe de Terreno, Prevencionista) |
-| `app-movil.md` | **En stand by** — no especificar aún | — |
+| `app-movil.md` | **v0.1 borrador (12-11-2026)** — Etapa 2 activa | DispositivoPush (push); pantallas de terreno sobre la API existente |
 
 > Cada spec sigue el formato canónico de 10 secciones usado en FAS: Propósito, Actores, Glosario, Modelo de Datos, Flujos, Reglas, Validaciones, Estados, Integraciones, Pendientes.
 
@@ -334,7 +334,7 @@ Ver `docker-compose.yml` en la raíz del proyecto (PostgreSQL 17, Redis 7, pgAdm
 - Proveedor de IA aún no elegido — se parte con `AI_PROVIDER=mock` y adaptador genérico, igual que el patrón de adaptador DTE de FAS.
 - **Modelo de accesos GRANULAR (07-10-2026, v2):** `Perfil` tiene un nivel (SIN_ACCESO/LECTURA/TOTAL) por **Función** dentro de cada Área (toggle Sí/No por área) + la función transversal **Obras**; `Usuario.esAdmin` = acceso total (bypassa el perfil). Reemplaza el modelo previo de "un nivel por Área" (`nivelPrevencion`/`nivelTecnica`), que queda obsoleto. Tablas: `Funcion`, `PerfilPermiso`. Guards: `requirePermiso(funcion, nivel)` y `requireAdmin` (esAdmin).
 - Formularios 100% dinámicos desde la Etapa 1 (no hay formularios hardcodeados en código): tipos de respuesta Checkbox, Selección múltiple, Número, Texto, Texto largo; foto por pregunta (habilitable y, si se habilita, marcable como obligatoria — `permiteFoto`/`fotoObligatoria`, 13-10-2026); permisos de ver/editar por usuario además del nivel de área.
-- Definición técnica de la Etapa 2 (App móvil) puesta en stand by el 04-10-2026 — foco 100% en Etapa 1 por ahora.
+- Definición técnica de la Etapa 2 (App móvil) puesta en stand by el 04-10-2026; **reactivada el 12-11-2026** (ver decisión canónica y `Docs/app-movil.md`).
 - Reglas de acceso y permisos cerradas el 04-10-2026: "Jefe Prevencionista" queda `SIN_ACCESO` en Técnica (difiere de la redacción "ambas" de alcop-esquema.html §08); `FormularioPermiso` solo amplía acceso, nunca lo niega; `CategoriaFormulario` es 100% dinámico, sin lista cerrada previa.
 - **Scaffold montado el 04-10-2026** (`alcop-api` + `alcop-web`). Decisión de stack frontend: se adopta **Next.js 16 + shadcn sobre Base UI** (lo que entrega `create-next-app@latest`/`shadcn@latest` hoy) en vez de forzar el downgrade a Next 15 / Radix del contrato original — diverge del template Kiranism/FAS a conciencia. `ky` fijado a v1.x. Backend fijado al contrato: **Prisma 5.x, Zod 3.x, TypeScript 5.x** (se bajaron desde las latest 7/4/7 que traía `npm install`). `dotenv` agregado al backend solo para cargar `.env` en desarrollo local (en Docker/prod la env la inyecta el entorno).
 - **Visibilidad por obra (11-11-2026, decisión de Christian):** un usuario no admin solo ve las obras con acceso vivo (`UsuarioObra`); `esAdmin` ve todas. Aplicado al listado/detalle de obras y al Dashboard vía `shared/obra-alcance.ts`. Supersede el "UsuarioObra no restringe" de `nucleo-compartido.md §6`. Pendiente: validar acceso por `obraId` en escrituras de visitas/registros/programación.

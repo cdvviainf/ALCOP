@@ -1,0 +1,27 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_VARIANT": "qa",
+        "EXPO_PUBLIC_API_URL": "https://zua9cnuqyxnq8vpwmrd1htiu.203.161.62.165.sslip.io/api"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_API_URL": "https://REEMPLAZAR-API-PRD/api"
+      }
+    }
+  }
+}

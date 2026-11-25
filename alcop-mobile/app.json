@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "ALCOP Terreno",
+    "slug": "alcop-terreno",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "cl.alcop.terreno"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E0441B",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "cl.alcop.terreno"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "ALCOP Terreno usa la cámara para fotografiar hallazgos y respuestas de formularios.",
+          "photosPermission": "ALCOP Terreno usa tus fotos para adjuntarlas a hallazgos y formularios."
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#1A1A1A"
+        }
+      ]
+    ],
+    "scheme": "alcop",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
