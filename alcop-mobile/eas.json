@@ -20,7 +20,7 @@
       },
       "env": {
         "APP_VARIANT": "production",
-        "EXPO_PUBLIC_API_URL": "https://REEMPLAZAR-API-PRD/api"
+        "EXPO_PUBLIC_API_URL": "https://api.alcop.cl/api"
       }
     }
   }

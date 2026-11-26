@@ -51,4 +51,7 @@ EXPOSE 3001
 # `migrate deploy` NO descarga nada en runtime. El PDF de procedimientos se guarda
 # en BD (bytea), no en disco → no hace falta volumen ni escritura a filesystem.
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/scripts/seed.js && node dist/server.js"]
+# SEED_ON_START=false (PRD) → solo migraciones de esquema, sin seed: los datos vienen
+# migrados de QA y el seed pisaría catálogos editados / recrearía obras demo. Default
+# (sin variable) = true → QA/dev mantienen el comportamiento actual.
+CMD ["sh", "-c", "npx prisma migrate deploy && if [ \"${SEED_ON_START:-true}\" = \"true\" ]; then node dist/scripts/seed.js; else echo 'Seed omitido (SEED_ON_START=false)'; fi && node dist/server.js"]
