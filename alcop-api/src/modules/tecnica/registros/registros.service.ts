@@ -6,7 +6,7 @@ import { esImagenValida, optimizarImagen } from '../../../shared/imagen.js'
 import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
 import { htmlToPdf } from '../../../shared/pdf.js'
-import { mapValores, tieneValor, type GuardarRespuestasInput } from '../../../shared/respuestas-formulario.js'
+import { mapValores, tieneValor, validarUnidadesDeObra, type GuardarRespuestasInput } from '../../../shared/respuestas-formulario.js'
 import { configuracionService } from '../../nucleo/configuracion/configuracion.service.js'
 import { construirHtmlReporte } from '../../prevencion/registros/registros.reporte.js'
 import type { AplicarFormularioInput, CerrarRegistroInput, EstadoRegistroTecnico } from './registros.schema.js'
@@ -77,6 +77,9 @@ export const registrosTecnicaService = {
   async obtener(id: number): Promise<RegistroTecnicoDetalleDTO> {
     const reg = await repo.buscar(id)
     if (!reg) throw new NotFoundError('Registro', String(id))
+    // Opciones de las preguntas "Unidad (Lote)": solo las unidades de ESTA obra.
+    const usaUnidad = reg.formulario.preguntas.some((p) => p.tipoRespuesta === 'LOTE_UNIDAD')
+    const unidades = usaUnidad ? await repo.unidadesDeObra(reg.obra.id) : []
     return {
       id: reg.id,
       fecha: diaObra(reg.fechaHora),
@@ -92,8 +95,11 @@ export const registrosTecnicaService = {
         valorNumero: r.valorNumero !== null ? Number(r.valorNumero) : null,
         valorCheckbox: r.valorCheckbox,
         valorSeleccionMultiple: r.valorSeleccionMultiple,
+        valorLoteUnidadId: r.valorLoteUnidadId,
+        valorLoteUnidad: r.valorLoteUnidad,
         fotos: r.fotos.map((f) => ({ id: f.id, mimetype: f.mimetype, orden: f.orden, url: fotoUrl(f.id) })),
       })),
+      unidades,
     }
   },
 
@@ -113,6 +119,8 @@ export const registrosTecnicaService = {
         if (!p) throw new ConflictError(`La pregunta ${item.preguntaId} no pertenece a este formulario.`)
         return { preguntaId: item.preguntaId, valores: mapValores(p.tipoRespuesta, item, p.opciones) }
       })
+      const unidadesPedidas = aGuardar.map((r) => r.valores.valorLoteUnidadId).filter((uid): uid is number => uid !== null)
+      validarUnidadesDeObra(unidadesPedidas, await repo.unidadesVivasDeObra(reg.obra.id, unidadesPedidas, tx))
       for (const r of aGuardar) await repo.upsertRespuestaPregunta(id, r.preguntaId, r.valores, tx)
       await repo.tocarRespuesta(id, usuarioId, tx)
     })

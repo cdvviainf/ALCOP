@@ -270,15 +270,25 @@ export const obrasRepository = {
     })
   },
 
-  /** De un set de unidades, cuáles tienen hallazgos (bloquean su eliminación). */
-  async unidadesConHallazgos(ids: number[], db: DbClient = prisma) {
+  /** De un set de unidades, cuáles están en uso (bloquean su eliminación): tienen
+   *  hallazgos de visita técnica o fueron elegidas en una pregunta "Unidad (Lote)". */
+  async unidadesEnUso(ids: number[], db: DbClient = prisma) {
     if (ids.length === 0) return []
-    const rows = await db.hallazgoTecnico.groupBy({
-      by: ['loteUnidadId'],
-      where: { loteUnidadId: { in: ids }, eliminadoEn: null },
-      _count: { _all: true },
-    })
-    return rows.map((r) => r.loteUnidadId)
+    const [hallazgos, respuestas] = await Promise.all([
+      db.hallazgoTecnico.groupBy({
+        by: ['loteUnidadId'],
+        where: { loteUnidadId: { in: ids }, eliminadoEn: null },
+        _count: { _all: true },
+      }),
+      db.respuestaPregunta.groupBy({
+        by: ['valorLoteUnidadId'],
+        where: { valorLoteUnidadId: { in: ids } },
+        _count: { _all: true },
+      }),
+    ])
+    const enUso = new Set<number>(hallazgos.map((r) => r.loteUnidadId))
+    for (const r of respuestas) if (r.valorLoteUnidadId !== null) enUso.add(r.valorLoteUnidadId)
+    return [...enUso]
   },
 
   /** Aplica la sincronización de unidades (crear/revivir/renombrar/quitar). Usa el

@@ -12,9 +12,9 @@ const detalleInclude = {
 } as const
 
 /** Mapea preguntas de entrada a filas Prisma (orden = posición; opciones solo si aplica). */
-function preguntasCreate(preguntas: PreguntaInput[]) {
+function preguntasCreate(preguntas: PreguntaInput[], ordenInicial = 1) {
   return preguntas.map((p, i) => ({
-    orden: i + 1,
+    orden: ordenInicial + i,
     texto: p.texto,
     tipoRespuesta: p.tipoRespuesta,
     obligatoria: p.obligatoria,
@@ -129,12 +129,21 @@ export const formulariosRepository = {
       requiereObra?: boolean
       activo?: boolean
     },
-    preguntas?: PreguntaInput[]
+    preguntas?: PreguntaInput[],
+    preguntasNuevas?: PreguntaInput[]
   ) {
     // Si vienen preguntas, se reemplaza el set completo (borra + recrea) en una
     // transacción. El service ya garantizó que el formulario no tiene respuestas.
+    // `preguntasNuevas` en cambio se agregan al final conservando las existentes.
     return prisma.$transaction(async (tx) => {
       if (preguntas) await tx.pregunta.deleteMany({ where: { formularioId: id } })
+      let nuevas: ReturnType<typeof preguntasCreate> = []
+      if (preguntasNuevas?.length) {
+        // Serializa altas concurrentes sobre el mismo formulario (orden consecutivo).
+        await tx.$queryRaw`SELECT id FROM "Formulario" WHERE id = ${id} FOR UPDATE`
+        const max = await tx.pregunta.aggregate({ where: { formularioId: id }, _max: { orden: true } })
+        nuevas = preguntasCreate(preguntasNuevas, (max._max.orden ?? 0) + 1)
+      }
       return tx.formulario.update({
         where: { id },
         data: {
@@ -144,6 +153,7 @@ export const formulariosRepository = {
           ...(data.requiereObra !== undefined ? { requiereObra: data.requiereObra } : {}),
           ...(data.activo !== undefined ? { activo: data.activo } : {}),
           ...(preguntas ? { preguntas: { create: preguntasCreate(preguntas) } } : {}),
+          ...(nuevas.length ? { preguntas: { create: nuevas } } : {}),
         },
         include: detalleInclude,
       })

@@ -7,6 +7,7 @@ export const tipoRespuestaSchema = z.enum([
   'NUMERO',
   'TEXTO',
   'TEXTO_LARGO',
+  'LOTE_UNIDAD',
 ])
 
 /** Query del maestro: paginación + búsqueda + filtros por área/categoría. */
@@ -64,9 +65,17 @@ export const actualizarFormularioSchema = z
     categoriaId: z.coerce.number().int().positive().optional(),
     activo: z.boolean().optional(),
     preguntas: z.array(preguntaSchema).min(1, 'Agrega al menos una pregunta').optional(),
+    // Preguntas a AGREGAR al final, sin tocar las existentes. Se admite aunque el
+    // formulario tenga respuestas: las respuestas previas quedan sin respuesta en
+    // las nuevas (formularios-dinamicos.md §12).
+    preguntasNuevas: z.array(preguntaSchema).min(1, 'Agrega al menos una pregunta').optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'Debe enviar al menos un campo a actualizar',
+  })
+  .refine((data) => !(data.preguntas && data.preguntasNuevas), {
+    message: 'Envía `preguntas` (reemplazo completo) o `preguntasNuevas` (agregar al final), no ambas.',
+    path: ['preguntasNuevas'],
   })
 
 export type PreguntaInput = z.infer<typeof preguntaSchema>

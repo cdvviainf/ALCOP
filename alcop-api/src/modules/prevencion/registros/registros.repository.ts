@@ -1,4 +1,5 @@
 import { Prisma, type CalidadImagen } from '@prisma/client'
+import type { ValoresRespuesta } from '../../../shared/respuestas-formulario.js'
 import { prisma } from '../../../lib/prisma.js'
 import type { PaginationQuery } from '../../../shared/pagination.js'
 import { toPrismaRange } from '../../../shared/pagination.js'
@@ -36,6 +37,7 @@ const conContenido: Prisma.RespuestaPreguntaWhereInput = {
     { valorNumero: { not: null } },
     { valorCheckbox: { not: null } },
     { valorSeleccionMultiple: { isEmpty: false } },
+    { valorLoteUnidadId: { not: null } },
     { fotos: { some: {} } },
   ],
 }
@@ -113,6 +115,8 @@ export const registrosRepository = {
                 valorNumero: true,
                 valorCheckbox: true,
                 valorSeleccionMultiple: true,
+                valorLoteUnidadId: true,
+                valorLoteUnidad: { select: { id: true, descripcion: true } },
                 fotos: fotoSelect,
               },
             },
@@ -141,6 +145,8 @@ export const registrosRepository = {
                 valorNumero: true,
                 valorCheckbox: true,
                 valorSeleccionMultiple: true,
+                valorLoteUnidadId: true,
+                valorLoteUnidad: { select: { id: true, descripcion: true } },
                 fotos: { orderBy: { orden: 'asc' }, select: { mimetype: true, data: { select: { datos: true } } } },
               },
             },
@@ -148,6 +154,25 @@ export const registrosRepository = {
         },
       },
     })
+  },
+
+  /** Unidades de lote vivas de la obra (opciones de las preguntas LOTE_UNIDAD). */
+  async unidadesDeObra(obraId: number, db: DbClient = prisma) {
+    return db.loteUnidad.findMany({
+      where: { obraId, eliminadoEn: null },
+      orderBy: [{ tipoLote: { orden: 'asc' } }, { tipoLoteId: 'asc' }, { correlativo: 'asc' }],
+      select: { id: true, descripcion: true },
+    })
+  },
+
+  /** De `ids`, cuáles son unidades vivas de la obra (valida respuestas LOTE_UNIDAD). */
+  async unidadesVivasDeObra(obraId: number, ids: number[], db: DbClient = prisma): Promise<Set<number>> {
+    if (ids.length === 0) return new Set()
+    const rows = await db.loteUnidad.findMany({
+      where: { id: { in: ids }, obraId, eliminadoEn: null },
+      select: { id: true },
+    })
+    return new Set(rows.map((r) => r.id))
   },
 
   /** Bloquea el registro (FOR UPDATE) para serializar guardar/cerrar/fotos. */
@@ -180,12 +205,7 @@ export const registrosRepository = {
   async upsertRespuestaPregunta(
     respuestaFormularioId: number,
     preguntaId: number,
-    valores: {
-      valorTexto: string | null
-      valorNumero: number | null
-      valorCheckbox: string | null
-      valorSeleccionMultiple: string[]
-    },
+    valores: ValoresRespuesta,
     db: DbClient = prisma
   ) {
     return db.respuestaPregunta.upsert({

@@ -6,7 +6,7 @@ import { paginate } from '../../../shared/pagination.js'
 import type { Paginated, PaginationQuery } from '../../../shared/pagination.js'
 import { esImagenValida, optimizarImagen } from '../../../shared/imagen.js'
 import { htmlToPdf } from '../../../shared/pdf.js'
-import { mapValores, tieneValor } from '../../../shared/respuestas-formulario.js'
+import { mapValores, tieneValor, validarUnidadesDeObra } from '../../../shared/respuestas-formulario.js'
 import { configuracionService } from '../../nucleo/configuracion/configuracion.service.js'
 import { construirHtmlReporte } from './registros.reporte.js'
 import { registrosRepository } from './registros.repository.js'
@@ -16,6 +16,7 @@ import type {
   RegistroDetalleDTO,
   RegistroListaDTO,
   RespuestaPreguntaDTO,
+  UnidadOpcionDTO,
 } from './registros.types.js'
 
 // "Hoy" en la zona de la obra (igual que programación/procedimientos).
@@ -40,7 +41,7 @@ function estadoDe(fechaStr: string, cerrado: boolean, hoy: string): EstadoRegist
 
 type RegistroRow = NonNullable<Awaited<ReturnType<typeof registrosRepository.buscarRegistro>>>
 
-function detalleToDTO(reg: RegistroRow, hoy: string): RegistroDetalleDTO {
+function detalleToDTO(reg: RegistroRow, hoy: string, unidades: UnidadOpcionDTO[]): RegistroDetalleDTO {
   const cerrado = reg.respuesta?.estado === 'CERRADO'
   const fecha = diaDe(reg.programacion.fecha)
   const respuestas: RespuestaPreguntaDTO[] = (reg.respuesta?.respuestas ?? []).map((r) => ({
@@ -49,6 +50,8 @@ function detalleToDTO(reg: RegistroRow, hoy: string): RegistroDetalleDTO {
     valorNumero: r.valorNumero !== null ? Number(r.valorNumero) : null,
     valorCheckbox: r.valorCheckbox,
     valorSeleccionMultiple: r.valorSeleccionMultiple,
+    valorLoteUnidadId: r.valorLoteUnidadId,
+    valorLoteUnidad: r.valorLoteUnidad,
     fotos: r.fotos.map((f) => ({ id: f.id, mimetype: f.mimetype, orden: f.orden, url: `/api/prevencion/registros/fotos/${f.id}` })),
   }))
   return {
@@ -70,6 +73,7 @@ function detalleToDTO(reg: RegistroRow, hoy: string): RegistroDetalleDTO {
       opciones: p.opciones,
     })),
     respuestas,
+    unidades,
   }
 }
 
@@ -101,7 +105,10 @@ export const registrosService = {
   async obtener(fpId: number): Promise<RegistroDetalleDTO> {
     const reg = await registrosRepository.buscarRegistro(fpId)
     if (!reg) throw new NotFoundError('Registro', String(fpId))
-    return detalleToDTO(reg, hoyStr())
+    // Opciones de las preguntas "Unidad (Lote)": solo las unidades de ESTA obra.
+    const usaUnidad = reg.formulario.preguntas.some((p) => p.tipoRespuesta === 'LOTE_UNIDAD')
+    const unidades = usaUnidad ? await registrosRepository.unidadesDeObra(reg.programacion.obra.id) : []
+    return detalleToDTO(reg, hoyStr(), unidades)
   },
 
   /** Guardado parcial de respuestas (no exige completar). */
@@ -121,6 +128,11 @@ export const registrosService = {
         if (!p) throw new ConflictError(`La pregunta ${item.preguntaId} no pertenece a este formulario.`)
         return { preguntaId: item.preguntaId, valores: mapValores(p.tipoRespuesta, item, p.opciones) }
       })
+      const unidadesPedidas = aGuardar.map((r) => r.valores.valorLoteUnidadId).filter((id): id is number => id !== null)
+      validarUnidadesDeObra(
+        unidadesPedidas,
+        await registrosRepository.unidadesVivasDeObra(reg.programacion.obra.id, unidadesPedidas, tx)
+      )
 
       const rf = await registrosRepository.ensureRespuesta(
         { formularioProgramadoId: fpId, formularioId: reg.formulario.id, obraId: reg.programacion.obra.id, usuarioId },

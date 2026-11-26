@@ -215,7 +215,7 @@ alcop-web/
 | `00-entorno-general.md` | Borrador inicial | Convenciones transversales, visibilidad por perfil |
 | `00-mantenedores-requeridos.md` | **Cerrado** | Listado consolidado de catálogos (Area, CategoriaFormulario, NivelRiesgo, EtapaNido, RolObra, etc.) |
 | `usuarios-perfiles.md` | **Cerrado (v2 granular)** | Area, Usuario (esAdmin), Perfil + Funcion + PerfilPermiso, UsuarioObra |
-| `formularios-dinamicos.md` | **Cerrado** | CategoriaFormulario, Formulario, Pregunta, RespuestaFormulario, RespuestaPregunta, FormularioPermiso |
+| `formularios-dinamicos.md` | **Cerrado** (+ anexo §11 "Unidad (Lote)", 26-11-2026) | CategoriaFormulario, Formulario, Pregunta, RespuestaFormulario, RespuestaPregunta, FormularioPermiso |
 | `nucleo-compartido.md` | **Cerrado (v0.1)** + anexo Dashboard (11-11-2026) | Obra, UsuarioObra, ObraTitular; Dashboard (`GET /api/nucleo/dashboard`) |
 | `lotes-procedimientos.md` | **Cerrado (v0.1, 12-10-2026)** | TipoLote, Procedimiento (PDF), TipoLoteProcedimiento, ProcedimientoFormulario, ObraLote; cadena Obra→Lotes→Procedimientos→Formularios + derivación de formularios aplicables |
 | `prevencion.md` | **v0.1 (22-10-2026)** — Ola 1 (clasificación Categoría › Subcategoría) + Ola 2 (Visitas de Prevención) cerradas; AnalisisIA pendiente | SubcategoriaFormulario, VisitaPrevencion, HallazgoPrevencion; (pend.) AnalisisIA |

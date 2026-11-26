@@ -3,6 +3,7 @@ import type {
   ObraMini,
   PreguntaRegistroDTO,
   RespuestaPreguntaDTO,
+  UnidadOpcionDTO,
 } from '../../prevencion/registros/registros.types.js'
 import type { EstadoRegistroTecnico } from './registros.schema.js'
 
@@ -28,4 +29,5 @@ export interface RegistroTecnicoDetalleDTO {
   fechaRevision: string | null
   preguntas: PreguntaRegistroDTO[]
   respuestas: RespuestaPreguntaDTO[]
+  unidades: UnidadOpcionDTO[]
 }

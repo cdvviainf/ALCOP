@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PreguntaTexto } from '@/components/shared/pregunta-texto'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -23,7 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-type TipoRespuesta = 'CHECKBOX' | 'SELECCION_MULTIPLE' | 'NUMERO' | 'TEXTO' | 'TEXTO_LARGO'
+type TipoRespuesta = 'CHECKBOX' | 'SELECCION_MULTIPLE' | 'NUMERO' | 'TEXTO' | 'TEXTO_LARGO' | 'LOTE_UNIDAD'
 type EstadoRegistro = 'POR_APLICAR' | 'VIGENTE' | 'ATRASADO' | 'COMPLETADO'
 interface Me {
   esAdmin: boolean
@@ -41,7 +42,13 @@ interface RespuestaPregunta {
   valorNumero: number | null
   valorCheckbox: string | null
   valorSeleccionMultiple: string[]
+  valorLoteUnidadId: number | null
+  valorLoteUnidad: Unidad | null
   fotos: FotoResp[]
+}
+interface Unidad {
+  id: number
+  descripcion: string
 }
 interface Pregunta {
   id: number
@@ -63,6 +70,8 @@ interface Registro {
   fechaRevision: string | null
   preguntas: Pregunta[]
   respuestas: RespuestaPregunta[]
+  /** Unidades de lote de la obra del registro (opciones de las preguntas LOTE_UNIDAD). */
+  unidades: Unidad[]
 }
 
 interface Valor {
@@ -71,9 +80,11 @@ interface Valor {
   // CHECKBOX = Cumple / No cumple / N.A. (valor canónico); '' = sin responder.
   valorCheckbox: string
   valorSeleccionMultiple: string[]
+  // LOTE_UNIDAD: id de la LoteUnidad como string; '' = sin responder.
+  valorLoteUnidadId: string
 }
 
-const VACIO: Valor = { valorTexto: '', valorNumero: '', valorCheckbox: '', valorSeleccionMultiple: [] }
+const VACIO: Valor = { valorTexto: '', valorNumero: '', valorCheckbox: '', valorSeleccionMultiple: [], valorLoteUnidadId: '' }
 const CHECK_OPCIONES = [
   { value: 'CUMPLE', label: 'Cumple' },
   { value: 'NO_CUMPLE', label: 'No cumple' },
@@ -99,6 +110,7 @@ function seed(reg: Registro): Map<number, Valor> {
       valorNumero: r?.valorNumero != null ? String(r.valorNumero) : '',
       valorCheckbox: r?.valorCheckbox ?? '',
       valorSeleccionMultiple: r?.valorSeleccionMultiple ?? [],
+      valorLoteUnidadId: r?.valorLoteUnidadId != null ? String(r.valorLoteUnidadId) : '',
     })
   }
   return m
@@ -164,6 +176,7 @@ export function RegistroFormularioDetalle({ registroId, config }: { registroId: 
           valorNumero: v?.valorNumero?.trim() ? Number(v.valorNumero) : null,
           valorCheckbox: v?.valorCheckbox ? v.valorCheckbox : null,
           valorSeleccionMultiple: v?.valorSeleccionMultiple ?? [],
+          valorLoteUnidadId: v?.valorLoteUnidadId ? Number(v.valorLoteUnidadId) : null,
         }
       })
       return api.put(`${apiBase}/${fpId}/respuestas`, { json: { respuestas } }).json<Registro>()
@@ -250,6 +263,7 @@ export function RegistroFormularioDetalle({ registroId, config }: { registroId: 
                     pregunta={p}
                     valor={answers.get(p.id)}
                     fotos={r?.fotos ?? []}
+                    unidades={unidadesDe(reg.unidades, r?.valorLoteUnidad ?? null)}
                     editable={editable}
                     apiBase={apiBase}
                     registroId={fpId}
@@ -299,11 +313,18 @@ export function RegistroFormularioDetalle({ registroId, config }: { registroId: 
   )
 }
 
+/** Unidades de la obra + la ya elegida si dejó de estar vigente (para seguir mostrándola). */
+function unidadesDe(unidades: Unidad[], elegida: Unidad | null): Unidad[] {
+  if (!elegida || unidades.some((u) => u.id === elegida.id)) return unidades
+  return [elegida, ...unidades]
+}
+
 function PreguntaCard({
   index,
   pregunta,
   valor,
   fotos,
+  unidades,
   editable,
   apiBase,
   registroId,
@@ -314,6 +335,7 @@ function PreguntaCard({
   pregunta: Pregunta
   valor: Valor | undefined
   fotos: FotoResp[]
+  unidades: Unidad[]
   editable: boolean
   apiBase: string
   registroId: number
@@ -377,6 +399,24 @@ function PreguntaCard({
             onChange={(e) => onChange({ valorNumero: e.target.value })}
             className="max-w-xs"
           />
+        ) : pregunta.tipoRespuesta === 'LOTE_UNIDAD' ? (
+          <Select
+            value={v.valorLoteUnidadId || null}
+            onValueChange={(val) => onChange({ valorLoteUnidadId: typeof val === 'string' ? val : '' })}
+            items={Object.fromEntries(unidades.map((u) => [String(u.id), u.descripcion]))}
+            disabled={!editable}
+          >
+            <SelectTrigger className="w-full max-w-xs">
+              <SelectValue placeholder={unidades.length ? 'Selecciona la unidad…' : 'La obra no tiene unidades'} />
+            </SelectTrigger>
+            <SelectContent>
+              {unidades.map((u) => (
+                <SelectItem key={u.id} value={String(u.id)}>
+                  {u.descripcion}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : pregunta.tipoRespuesta === 'CHECKBOX' ? (
           <div className="flex flex-wrap gap-2">
             {CHECK_OPCIONES.map((opt) => (

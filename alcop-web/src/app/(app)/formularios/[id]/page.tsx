@@ -10,7 +10,7 @@ import { FormularioBuilder, type BuilderValues } from '@/components/modules/form
 
 interface PreguntaDetalle {
   texto: string
-  tipoRespuesta: 'CHECKBOX' | 'SELECCION_MULTIPLE' | 'NUMERO' | 'TEXTO' | 'TEXTO_LARGO'
+  tipoRespuesta: 'CHECKBOX' | 'SELECCION_MULTIPLE' | 'NUMERO' | 'TEXTO' | 'TEXTO_LARGO' | 'LOTE_UNIDAD'
   obligatoria: boolean
   permiteFoto: boolean
   fotoObligatoria: boolean

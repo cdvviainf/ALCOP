@@ -12,6 +12,7 @@ const respuestaItemSchema = z.object({
   valorNumero: z.coerce.number().nullable().optional(),
   valorCheckbox: z.string().trim().max(500).nullable().optional(),
   valorSeleccionMultiple: z.array(z.string().trim().min(1)).optional(),
+  valorLoteUnidadId: z.coerce.number().int().positive().nullable().optional(),
 })
 
 export const guardarRespuestasSchema = z.object({
@@ -29,6 +30,16 @@ type ValorRow = {
   valorNumero: Prisma.Decimal | null
   valorCheckbox: string | null
   valorSeleccionMultiple: string[]
+  valorLoteUnidadId: number | null
+}
+
+/** Valores a persistir de una respuesta (uno solo no vacío, según el tipo). */
+export interface ValoresRespuesta {
+  valorTexto: string | null
+  valorNumero: number | null
+  valorCheckbox: string | null
+  valorSeleccionMultiple: string[]
+  valorLoteUnidadId: number | null
 }
 
 /** ¿La respuesta satisface una pregunta obligatoria, según su tipo? */
@@ -44,16 +55,24 @@ export function tieneValor(tipo: TipoRespuesta, r: ValorRow | undefined): boolea
     case 'TEXTO':
     case 'TEXTO_LARGO':
       return !!r.valorTexto && r.valorTexto.trim().length > 0
+    case 'LOTE_UNIDAD':
+      return r.valorLoteUnidadId !== null
   }
 }
 
-/** Mapea el input al único campo de valor que corresponde al tipo de la pregunta. */
-export function mapValores(
-  tipo: TipoRespuesta,
-  input: RespuestaItemInput,
-  opciones: string[]
-): { valorTexto: string | null; valorNumero: number | null; valorCheckbox: string | null; valorSeleccionMultiple: string[] } {
-  const base = { valorTexto: null as string | null, valorNumero: null as number | null, valorCheckbox: null as string | null, valorSeleccionMultiple: [] as string[] }
+/**
+ * Mapea el input al único campo de valor que corresponde al tipo de la pregunta.
+ * LOTE_UNIDAD solo se mapea aquí: que la unidad pertenezca a la obra del registro lo
+ * valida el service con `validarUnidadesDeObra` (requiere BD).
+ */
+export function mapValores(tipo: TipoRespuesta, input: RespuestaItemInput, opciones: string[]): ValoresRespuesta {
+  const base: ValoresRespuesta = {
+    valorTexto: null,
+    valorNumero: null,
+    valorCheckbox: null,
+    valorSeleccionMultiple: [],
+    valorLoteUnidadId: null,
+  }
   switch (tipo) {
     case 'TEXTO':
     case 'TEXTO_LARGO':
@@ -76,5 +95,18 @@ export function mapValores(
       }
       return { ...base, valorSeleccionMultiple: sel }
     }
+    case 'LOTE_UNIDAD':
+      return { ...base, valorLoteUnidadId: input.valorLoteUnidadId ?? null }
+  }
+}
+
+/**
+ * Valida que las unidades elegidas en preguntas LOTE_UNIDAD sean unidades vivas de
+ * la obra del registro. `vivas` = ids de LoteUnidad vivos de esa obra entre los pedidos.
+ */
+export function validarUnidadesDeObra(pedidas: Array<number | null>, vivas: Set<number>): void {
+  const invalida = pedidas.find((id) => id !== null && !vivas.has(id))
+  if (invalida !== undefined) {
+    throw new BusinessError('UNIDAD_INVALIDA', `La unidad ${invalida} no pertenece a la obra del registro.`, 422)
   }
 }

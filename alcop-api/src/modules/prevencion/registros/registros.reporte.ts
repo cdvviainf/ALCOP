@@ -28,6 +28,7 @@ export interface ReporteData {
       valorNumero: Prisma.Decimal | null
       valorCheckbox: string | null
       valorSeleccionMultiple: string[]
+      valorLoteUnidad: { descripcion: string } | null
       fotos: Array<{ mimetype: string; data: { datos: Uint8Array } | null }>
     }>
   } | null
@@ -63,6 +64,8 @@ function valorTexto(tipo: TipoRespuesta, r: RespuestaRow | undefined): string {
     case 'TEXTO':
     case 'TEXTO_LARGO':
       return r.valorTexto ? esc(r.valorTexto) : '<span class="muted">Sin respuesta.</span>'
+    case 'LOTE_UNIDAD':
+      return r.valorLoteUnidad ? esc(r.valorLoteUnidad.descripcion) : '<span class="muted">Sin respuesta.</span>'
   }
 }
 

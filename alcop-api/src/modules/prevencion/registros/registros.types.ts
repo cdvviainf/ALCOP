@@ -41,7 +41,16 @@ export interface RespuestaPreguntaDTO {
   valorNumero: number | null
   valorCheckbox: string | null
   valorSeleccionMultiple: string[]
+  valorLoteUnidadId: number | null
+  /** Unidad elegida (aunque luego se haya quitado de la obra, para mostrarla). */
+  valorLoteUnidad: UnidadOpcionDTO | null
   fotos: FotoRespuestaDTO[]
+}
+
+/** Opción de una pregunta LOTE_UNIDAD: una unidad de lote de la obra. */
+export interface UnidadOpcionDTO {
+  id: number
+  descripcion: string
 }
 
 export interface PreguntaRegistroDTO {
@@ -66,4 +75,6 @@ export interface RegistroDetalleDTO {
   fechaRevision: string | null
   preguntas: PreguntaRegistroDTO[]
   respuestas: RespuestaPreguntaDTO[]
+  /** Unidades vivas de la obra; solo se cargan si el formulario tiene preguntas LOTE_UNIDAD. */
+  unidades: UnidadOpcionDTO[]
 }

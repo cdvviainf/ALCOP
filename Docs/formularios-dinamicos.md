@@ -163,3 +163,25 @@ model FormularioPermiso {
 **Diferido (acordado con Christian 12-10-2026):**
 - **Motor de LLENADO** (responder formularios → `RespuestaFormulario`/`RespuestaPregunta`, fotos, validaciones de respuesta §7, histórico) — va con la **vista operativa de Registros** (spec aparte). Hasta entonces el módulo solo administra plantillas (QA-FD-001).
 - **`FormularioPermiso`** (ampliar acceso por usuario, §4/§5.3): **2ª ola**. Hoy el acceso se rige solo por el nivel de Área; nadie queda bloqueado porque aún no hay forma de crear esas filas (QA-FD-002).
+
+## 11. Anexo — Tipo de pregunta "Unidad (Lote)" (26-11-2026)
+
+> Pedido de Christian (26-11-2026): los formularios deben permitir seleccionar la **Unidad (Lote)**, con una lista **dinámica** que muestre solo los lotes de la obra donde se llena el formulario.
+
+- **Nuevo `TipoRespuesta.LOTE_UNIDAD`** ("Unidad (Lote)" en el builder). No lleva `opciones`: las opciones se resuelven **al llenar**, y son las `LoteUnidad` vivas (`eliminadoEn = null`) de la obra del registro (`RespuestaFormulario.obraId`), autogeneradas desde `ObraLote` (`Docs/tecnica.md §5.1`, ej. `Casa 001`). Aplica a Registro Prevención y Registro Técnica (motor compartido).
+- **Modelo:** `RespuestaPregunta.valorLoteUnidadId Int?` → FK a `LoteUnidad` (`onDelete: SetNull`, índice). Migración `20261126000000_pregunta_lote_unidad`.
+- **API:** el detalle del registro trae `unidades: {id, descripcion}[]` (solo si el formulario tiene alguna pregunta `LOTE_UNIDAD`; si no, `[]`) y en cada respuesta `valorLoteUnidadId` + `valorLoteUnidad {id, descripcion}`. El guardado acepta `valorLoteUnidadId` (nullable).
+- **Validaciones:** al guardar, la unidad debe ser una `LoteUnidad` viva **de la obra del registro**; si no, `422 UNIDAD_INVALIDA`. Obligatoria = `valorLoteUnidadId` no nulo al cerrar.
+- **Integridad:** reducir/quitar un `ObraLote` se rechaza (409) si alguna unidad a quitar está **en uso**: tiene hallazgos técnicos **o** fue elegida en una respuesta de formulario.
+- **UI:** selector (Select) con las unidades de la obra; si la unidad elegida ya no está vigente, se sigue mostrando. El PDF del registro imprime la descripción de la unidad.
+- Para formularios que ya tienen respuestas (caso LCH-AT con respuestas importadas), la pregunta se agrega al final — ver §12.
+- Mismo pendiente que `tecnica.md §10`: búsqueda en el selector si una obra llega a cientos de unidades.
+
+## 12. Anexo — Agregar preguntas al final en formularios con respuestas (26-11-2026)
+
+> Decisión de Christian (26-11-2026): se permite **agregar** preguntas a un formulario que ya tiene respuestas, sin tocar las existentes.
+
+- **API:** `PATCH /api/nucleo/formularios/:id` acepta `preguntasNuevas: Pregunta[]` (≥1): se crean al final (`orden = max + 1…`, con lock del formulario) aunque haya respuestas. Excluyente con `preguntas` (reemplazo completo, que sigue bloqueado con respuestas — §6/QA-FD-003) → 400 si vienen ambas.
+- **Efecto en registros existentes:** los **cerrados** no cambian (la pregunta nueva queda "Sin respuesta" en su detalle/PDF). Los **borradores** abiertos la ven y, si es obligatoria, deben responderla para cerrar.
+- **UI (builder):** con respuestas, las preguntas actuales se muestran en solo lectura y "Agregar pregunta" crea tarjetas editables al final (se pueden reordenar/quitar entre ellas antes de guardar); al guardar solo se envían las nuevas.
+- Editar o quitar preguntas existentes de un formulario con respuestas sigue sin estar permitido.

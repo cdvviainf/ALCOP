@@ -24,6 +24,8 @@ const respuestaSelect = {
   valorNumero: true,
   valorCheckbox: true,
   valorSeleccionMultiple: true,
+  valorLoteUnidadId: true,
+  valorLoteUnidad: { select: { id: true, descripcion: true } },
 } as const
 
 const preguntaArgs = {
@@ -50,6 +52,8 @@ export const registrosTecnicaRepository = {
   crearFoto: respuestasRepository.crearFoto,
   borrarFoto: respuestasRepository.borrarFoto,
   obraViva: respuestasRepository.obraViva,
+  unidadesDeObra: respuestasRepository.unidadesDeObra,
+  unidadesVivasDeObra: respuestasRepository.unidadesVivasDeObra,
 
   /** Formularios técnicos que se pueden aplicar: activos y con preguntas. */
   async formulariosAplicables() {

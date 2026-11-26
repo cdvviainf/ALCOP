@@ -44,6 +44,7 @@ const TIPOS: Array<{ value: string; label: string }> = [
   { value: 'NUMERO', label: 'Número' },
   { value: 'TEXTO', label: 'Texto' },
   { value: 'TEXTO_LARGO', label: 'Texto largo' },
+  { value: 'LOTE_UNIDAD', label: 'Unidad (Lote)' },
 ]
 
 const FORM_FUNCION: Record<string, string> = { PREVENCION: 'PREV_FORMULARIOS', TECNICA: 'TEC_FORMULARIOS' }
@@ -53,7 +54,7 @@ const CAT_FUNCION: Record<string, string> = { PREVENCION: 'PREV_CAT_CATEGORIAS',
 
 const preguntaForm = z.object({
   texto: z.string().trim().min(1, 'El texto es obligatorio'),
-  tipoRespuesta: z.enum(['CHECKBOX', 'SELECCION_MULTIPLE', 'NUMERO', 'TEXTO', 'TEXTO_LARGO']),
+  tipoRespuesta: z.enum(['CHECKBOX', 'SELECCION_MULTIPLE', 'NUMERO', 'TEXTO', 'TEXTO_LARGO', 'LOTE_UNIDAD']),
   obligatoria: z.boolean(),
   permiteFoto: z.boolean(),
   fotoObligatoria: z.boolean(),
@@ -112,9 +113,12 @@ export function FormularioBuilder({
   modo: 'crear' | 'editar'
   initial: BuilderValues
   formularioId?: number
-  /** Si false (el formulario ya tiene respuestas), las preguntas no se editan (§6). */
+  /** Si false (el formulario ya tiene respuestas), las preguntas existentes no se
+   *  editan (§6); solo se pueden agregar preguntas nuevas al final (§12). */
   preguntasEditables?: boolean
 }) {
+  // Cantidad de preguntas existentes bloqueadas (solo lectura) al inicio de la lista.
+  const bloqueadas = preguntasEditables ? 0 : initial.preguntas.length
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -183,7 +187,7 @@ export function FormularioBuilder({
 
   const guardar = useMutation({
     mutationFn: (values: BuilderValues) => {
-      const preguntas = values.preguntas.map((p) => ({
+      const todas = values.preguntas.map((p) => ({
         texto: p.texto,
         tipoRespuesta: p.tipoRespuesta,
         obligatoria: p.obligatoria,
@@ -191,6 +195,7 @@ export function FormularioBuilder({
         fotoObligatoria: p.permiteFoto ? p.fotoObligatoria : false,
         opciones: p.tipoRespuesta === 'SELECCION_MULTIPLE' ? opcionesDe(p.opcionesText ?? '') : [],
       }))
+      const preguntas = todas
       if (modo === 'editar' && formularioId) {
         // Área y requiereObra son inmutables; `preguntas` solo si son editables
         // (no hay respuestas) — así desactivar un formulario con respuestas
@@ -202,6 +207,8 @@ export function FormularioBuilder({
           activo: values.activo,
         }
         if (preguntasEditables) json.preguntas = preguntas
+        // Con respuestas: solo se envían las agregadas al final (las existentes no se tocan).
+        else if (todas.length > bloqueadas) json.preguntasNuevas = todas.slice(bloqueadas)
         return api.patch(`nucleo/formularios/${formularioId}`, { json }).json()
       }
       // Alta: `activo` y `requiereObra` los fija el backend (QA-FD-006/007).
@@ -378,12 +385,10 @@ export function FormularioBuilder({
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-foreground">Preguntas</h2>
-          {preguntasEditables ? (
-            <Button type="button" variant="outline" size="sm" onClick={agregarPregunta}>
-              <Plus className="size-4" />
-              Agregar pregunta
-            </Button>
-          ) : null}
+          <Button type="button" variant="outline" size="sm" onClick={agregarPregunta}>
+            <Plus className="size-4" />
+            Agregar pregunta
+          </Button>
         </div>
         {typeof errors.preguntas?.message === 'string' ? (
           <p className="text-xs text-destructive">{errors.preguntas.message}</p>
@@ -391,30 +396,30 @@ export function FormularioBuilder({
 
         {!preguntasEditables ? (
           <p className="rounded-lg bg-warn-bg px-4 py-3 text-xs font-medium text-warn-fg">
-            Este formulario ya tiene respuestas registradas: sus preguntas no se pueden modificar. Puedes editar el nombre, el código, la categoría y el estado.
+            Este formulario ya tiene respuestas registradas: sus preguntas actuales no se pueden modificar, pero puedes
+            agregar preguntas nuevas al final. Las respuestas anteriores quedarán sin respuesta en ellas.
           </p>
         ) : null}
 
-        {!preguntasEditables ? (
-          <div className="space-y-2">
-            {preguntas?.map((p, i) => (
-              <div key={i} className="rounded-lg border border-border bg-card px-4 py-3">
-                <div className="text-sm font-medium text-foreground">
-                  #{i + 1} · <PreguntaTexto texto={p.texto} />
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {TIPOS.find((t) => t.value === p.tipoRespuesta)?.label ?? p.tipoRespuesta}
-                  {p.obligatoria ? ' · obligatoria' : ''}
-                  {p.permiteFoto ? (p.fotoObligatoria ? ' · foto obligatoria' : ' · con foto') : ''}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
         <div className="space-y-4">
           {fields.map((f, i) => {
             const tipo = preguntas?.[i]?.tipoRespuesta
             const errP = errors.preguntas?.[i]
+            if (i < bloqueadas) {
+              const p = preguntas?.[i]
+              return (
+                <div key={f.id} className="rounded-lg border border-border bg-card px-4 py-3">
+                  <div className="text-sm font-medium text-foreground">
+                    #{i + 1} · <PreguntaTexto texto={p?.texto ?? ''} />
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {TIPOS.find((t) => t.value === p?.tipoRespuesta)?.label ?? p?.tipoRespuesta}
+                    {p?.obligatoria ? ' · obligatoria' : ''}
+                    {p?.permiteFoto ? (p.fotoObligatoria ? ' · foto obligatoria' : ' · con foto') : ''}
+                  </div>
+                </div>
+              )
+            }
             return (
               <div key={f.id} className="space-y-3 rounded-xl border border-border bg-card p-5">
                 {/* Móvil: #N y botones arriba, el campo debajo a todo el ancho. */}
@@ -426,7 +431,7 @@ export function FormularioBuilder({
                     {errP?.texto?.message ? <p className="text-xs text-destructive">{errP.texto.message}</p> : null}
                   </div>
                   <div className="order-2 flex gap-1 sm:order-3 sm:mt-6">
-                    <Button type="button" variant="ghost" size="icon-sm" aria-label="Subir" disabled={i === 0} onClick={() => move(i, i - 1)}>
+                    <Button type="button" variant="ghost" size="icon-sm" aria-label="Subir" disabled={i === bloqueadas} onClick={() => move(i, i - 1)}>
                       <ArrowUp />
                     </Button>
                     <Button type="button" variant="ghost" size="icon-sm" aria-label="Bajar" disabled={i === fields.length - 1} onClick={() => move(i, i + 1)}>
@@ -438,7 +443,7 @@ export function FormularioBuilder({
                       size="icon-sm"
                       aria-label="Quitar"
                       className="text-destructive hover:text-destructive"
-                      disabled={fields.length === 1}
+                      disabled={fields.length === 1 || i < bloqueadas}
                       onClick={() => remove(i)}
                     >
                       <Trash2 />
@@ -525,6 +530,10 @@ export function FormularioBuilder({
                       <p className="text-xs text-destructive">{errP.opcionesText.message}</p>
                     ) : null}
                   </div>
+                ) : tipo === 'LOTE_UNIDAD' ? (
+                  <p className="text-xs text-muted-foreground">
+                    Al llenar el formulario se elige entre las unidades de lote de la obra del registro (ej. Casa 001).
+                  </p>
                 ) : null}
               </div>
             )
@@ -534,7 +543,6 @@ export function FormularioBuilder({
             Nueva pregunta
           </Button>
         </div>
-        )}
       </section>
 
       <div className="flex justify-end gap-2">

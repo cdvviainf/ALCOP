@@ -208,7 +208,8 @@ export const formulariosService = {
           categoriaId: data.categoriaId,
           activo: data.activo,
         },
-        data.preguntas
+        data.preguntas,
+        data.preguntasNuevas
       )
       return detalleToDTO(row)
     } catch (err) {

@@ -101,6 +101,9 @@ enum TipoRespuesta {
   NUMERO
   TEXTO
   TEXTO_LARGO
+  // Unidad de lote (Casa 001…): las opciones son las LoteUnidad vivas de la obra
+  // del registro, resueltas al llenar (Docs/formularios-dinamicos.md §11).
+  LOTE_UNIDAD
 }
 
 model Area {
@@ -417,9 +420,13 @@ model RespuestaPregunta {
   valorNumero            Decimal?
   valorCheckbox          String?
   valorSeleccionMultiple String[]
+  // Respuesta de una pregunta LOTE_UNIDAD (unidad de la obra del registro).
+  valorLoteUnidadId      Int?
+  valorLoteUnidad        LoteUnidad?             @relation(fields: [valorLoteUnidadId], references: [id])
   fotos                  RespuestaPreguntaFoto[]
 
   @@unique([respuestaFormularioId, preguntaId])
+  @@index([valorLoteUnidadId])
 }
 
 // Foto de una respuesta (metadata, sin binario → no se arrastra en listados).
@@ -577,15 +584,16 @@ enum TipoRegistroHallazgo {
 
 // Unidad individual de lote, autogenerada desde ObraLote (ej. "Casa 001").
 model LoteUnidad {
-  id          Int               @id @default(autoincrement())
+  id          Int                 @id @default(autoincrement())
   obraId      Int
-  obra        Obra              @relation(fields: [obraId], references: [id])
+  obra        Obra                @relation(fields: [obraId], references: [id])
   tipoLoteId  Int
-  tipoLote    TipoLote          @relation(fields: [tipoLoteId], references: [id])
+  tipoLote    TipoLote            @relation(fields: [tipoLoteId], references: [id])
   correlativo Int
   descripcion String
   hallazgos   HallazgoTecnico[]
-  creadoEn    DateTime          @default(now())
+  respuestas  RespuestaPregunta[]
+  creadoEn    DateTime            @default(now())
   eliminadoEn DateTime?
 
   @@unique([obraId, tipoLoteId, correlativo])

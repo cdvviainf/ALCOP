@@ -80,7 +80,7 @@ function descUnidad(nombre: string, correlativo: number, ancho: number): string 
 /**
  * Sincroniza las unidades de lote de un tipo en una obra a `cantidadTarget`:
  * crea/revive 1..cantidadTarget y quita las > cantidadTarget. Si alguna unidad a
- * quitar tiene hallazgos, se rechaza (no se puede reducir). Lanza ANTES de tocar
+ * quitar está en uso (hallazgos o respuestas de formulario), se rechaza. Lanza ANTES de tocar
  * el ObraLote para no dejar inconsistencia.
  */
 async function sincronizarUnidades(
@@ -115,10 +115,10 @@ async function sincronizarUnidades(
   }
   const aQuitar = activos.filter((u) => u.correlativo > cantidadTarget).map((u) => u.id)
   if (aQuitar.length) {
-    const conHallazgos = await obrasRepository.unidadesConHallazgos(aQuitar, db)
-    if (conHallazgos.length) {
+    const enUso = await obrasRepository.unidadesEnUso(aQuitar, db)
+    if (enUso.length) {
       throw new ConflictError(
-        `No se puede reducir la cantidad: ${conHallazgos.length} unidad(es) tienen hallazgos registrados.`
+        `No se puede reducir la cantidad: ${enUso.length} unidad(es) tienen hallazgos o respuestas de formularios registrados.`
       )
     }
   }
