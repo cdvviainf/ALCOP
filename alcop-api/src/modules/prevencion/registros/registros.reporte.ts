@@ -65,7 +65,9 @@ function valorTexto(tipo: TipoRespuesta, r: RespuestaRow | undefined): string {
     case 'TEXTO_LARGO':
       return r.valorTexto ? esc(r.valorTexto) : '<span class="muted">Sin respuesta.</span>'
     case 'LOTE_UNIDAD':
-      return r.valorLoteUnidad ? esc(r.valorLoteUnidad.descripcion) : '<span class="muted">Sin respuesta.</span>'
+      // Respuestas previas a la conversión de "Ubicación" pueden tener solo el texto original.
+      if (r.valorLoteUnidad) return esc(r.valorLoteUnidad.descripcion)
+      return r.valorTexto ? esc(r.valorTexto) : '<span class="muted">Sin respuesta.</span>'
   }
 }
 

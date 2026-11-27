@@ -400,23 +400,29 @@ function PreguntaCard({
             className="max-w-xs"
           />
         ) : pregunta.tipoRespuesta === 'LOTE_UNIDAD' ? (
-          <Select
-            value={v.valorLoteUnidadId || null}
-            onValueChange={(val) => onChange({ valorLoteUnidadId: typeof val === 'string' ? val : '' })}
-            items={Object.fromEntries(unidades.map((u) => [String(u.id), u.descripcion]))}
-            disabled={!editable}
-          >
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder={unidades.length ? 'Selecciona la unidad…' : 'La obra no tiene unidades'} />
-            </SelectTrigger>
-            <SelectContent>
-              {unidades.map((u) => (
-                <SelectItem key={u.id} value={String(u.id)}>
-                  {u.descripcion}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1.5">
+            <Select
+              value={v.valorLoteUnidadId || null}
+              onValueChange={(val) => onChange({ valorLoteUnidadId: typeof val === 'string' ? val : '' })}
+              items={Object.fromEntries(unidades.map((u) => [String(u.id), u.descripcion]))}
+              disabled={!editable}
+            >
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder={unidades.length ? 'Selecciona la unidad…' : 'La obra no tiene unidades'} />
+              </SelectTrigger>
+              <SelectContent>
+                {unidades.map((u) => (
+                  <SelectItem key={u.id} value={String(u.id)}>
+                    {u.descripcion}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* Registros anteriores a la conversión de "Ubicación" a lista: texto original. */}
+            {!v.valorLoteUnidadId && v.valorTexto ? (
+              <p className="text-xs text-muted-foreground">Registrado como texto: «{v.valorTexto}»</p>
+            ) : null}
+          </div>
         ) : pregunta.tipoRespuesta === 'CHECKBOX' ? (
           <div className="flex flex-wrap gap-2">
             {CHECK_OPCIONES.map((opt) => (

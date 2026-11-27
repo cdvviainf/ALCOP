@@ -185,3 +185,11 @@ model FormularioPermiso {
 - **Efecto en registros existentes:** los **cerrados** no cambian (la pregunta nueva queda "Sin respuesta" en su detalle/PDF). Los **borradores** abiertos la ven y, si es obligatoria, deben responderla para cerrar.
 - **UI (builder):** con respuestas, las preguntas actuales se muestran en solo lectura y "Agregar pregunta" crea tarjetas editables al final (se pueden reordenar/quitar entre ellas antes de guardar); al guardar solo se envían las nuevas.
 - Editar o quitar preguntas existentes de un formulario con respuestas sigue sin estar permitido.
+
+## 13. Anexo — "Ubicación" de Técnica = Unidad (Lote) (27-11-2026)
+
+> Corrección de Christian (27-11-2026): la pregunta **"Ubicación"** de los formularios técnicos no debe ser texto, sino el listado de lotes de la obra.
+
+- Migración `20261127000000_ubicacion_lote_unidad`: toda pregunta `TEXTO` de un formulario del área Técnica cuyo texto (sin marcas `*`) sea "Ubicación" pasa a `LOTE_UNIDAD`.
+- Respuestas previas en texto ("Lote 94 (Ch III)", "Casa 7 (CO)"): se vinculan a la `LoteUnidad` de la obra del registro cuando el texto empieza con `<nombre del tipo de lote> <número>` (mismo tipo, mismo correlativo). El texto original se conserva en `valorTexto`; si no hubo calce, la UI muestra "Registrado como texto: «…»" y el PDF imprime ese texto.
+- La migración corre una sola vez: si una obra configura sus lotes **después**, las respuestas antiguas de esa obra quedan con el texto original.
