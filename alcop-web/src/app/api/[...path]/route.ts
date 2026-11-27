@@ -21,6 +21,9 @@ async function handler(req: NextRequest): Promise<NextResponse> {
 
   const headers = new Headers(req.headers)
   headers.set('x-forwarded-host', req.nextUrl.host)
+  // El fetch de Node descomprime solo; pedir identidad evita reenviar un body
+  // ya descomprimido con Content-Encoding: gzip (Traefik comprime si se pasa por él).
+  headers.delete('accept-encoding')
 
   const body = req.method !== 'GET' && req.method !== 'HEAD' ? await req.arrayBuffer() : undefined
 
@@ -32,9 +35,13 @@ async function handler(req: NextRequest): Promise<NextResponse> {
     duplex: 'half',
   })
 
+  // fetch ya entrega el body descomprimido: no reenviar encoding/longitud del upstream.
+  const responseHeaders = new Headers(upstream.headers)
+  for (const h of ['content-encoding', 'content-length', 'transfer-encoding']) responseHeaders.delete(h)
+
   return new NextResponse(upstream.body, {
     status: upstream.status,
-    headers: upstream.headers,
+    headers: responseHeaders,
   })
 }
 

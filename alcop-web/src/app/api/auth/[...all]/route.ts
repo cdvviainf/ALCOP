@@ -18,6 +18,9 @@ async function handler(req: NextRequest): Promise<NextResponse> {
   const headers = new Headers(req.headers)
   // Next.js añade x-forwarded-for; aseguramos que el host no confunda a Better Auth
   headers.set('x-forwarded-host', req.nextUrl.host)
+  // El fetch de Node descomprime solo; pedir identidad evita reenviar un body
+  // ya descomprimido con Content-Encoding: gzip (Traefik comprime si se pasa por él).
+  headers.delete('accept-encoding')
 
   const body = req.method !== 'GET' && req.method !== 'HEAD' ? await req.arrayBuffer() : undefined
 
@@ -30,6 +33,8 @@ async function handler(req: NextRequest): Promise<NextResponse> {
   })
 
   const responseHeaders = new Headers(upstream.headers)
+  // fetch ya entrega el body descomprimido: no reenviar encoding/longitud del upstream.
+  for (const h of ['content-encoding', 'content-length', 'transfer-encoding']) responseHeaders.delete(h)
   // Reescribir cookies que vengan con Domain del API para que funcionen en el frontend
   const setCookies = upstream.headers.getSetCookie?.() ?? []
   if (setCookies.length > 0) {

@@ -17,5 +17,6 @@ FILE="$OUT_DIR/alcop_${CONTAINER}_${STAMP}.dump"
 
 docker exec "$CONTAINER" sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --no-owner --no-acl' > "$FILE"
 [ -s "$FILE" ] || { echo "❌ Dump vacío"; rm -f "$FILE"; exit 1; }
-sha256sum "$FILE" > "$FILE.sha256"
+# Checksum con nombre relativo: así `sha256sum -c` funciona en otro servidor/carpeta.
+(cd "$OUT_DIR" && sha256sum "$(basename "$FILE")" > "$(basename "$FILE").sha256")
 echo "✅ $FILE ($(du -h "$FILE" | cut -f1))"
