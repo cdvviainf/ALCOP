@@ -1,8 +1,10 @@
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'expo-router'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { ChipArea, Tarjeta, TituloSeccion } from '@/components/ui'
+import { api, mensajeDeError } from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
 import { fechaCorta, relativo, useDashboard, type AgendaItem, type AreaResumen } from '@/lib/dashboard'
 import { useMe } from '@/lib/me'
@@ -50,10 +52,14 @@ function KpiVisitas({ titulo, area, data }: { titulo: string; area: 'TECNICA' | 
   )
 }
 
-function FilaAgenda({ a, hoy }: { a: AgendaItem; hoy: string }) {
+function FilaAgenda({ a, hoy, onAbrir }: { a: AgendaItem; hoy: string; onAbrir?: (a: AgendaItem) => void }) {
   const rel = relativo(a.vence < hoy ? a.vence : a.fecha, hoy)
   return (
-    <View style={styles.agendaFila}>
+    <Pressable
+      disabled={!onAbrir}
+      onPress={() => onAbrir?.(a)}
+      style={({ pressed }) => [styles.agendaFila, pressed && { opacity: 0.6 }]}
+    >
       <View style={styles.agendaArriba}>
         <Text style={styles.agendaFecha}>{fechaCorta(a.fecha)}</Text>
         <View
@@ -78,7 +84,7 @@ function FilaAgenda({ a, hoy }: { a: AgendaItem; hoy: string }) {
           {a.obra.nombre} · {a.formulario.codigo}
         </Text>
       </View>
-    </View>
+    </Pressable>
   )
 }
 
@@ -86,6 +92,23 @@ export default function Inicio() {
   const queryClient = useQueryClient()
   const { data: me } = useMe()
   const { data: d, isLoading, isError, refetch, isRefetching } = useDashboard()
+
+  const router = useRouter()
+  // Abrir un ítem de la agenda: Prevención abre su registro agendado; Técnica aplica
+  // el formulario en la obra (o retoma el que esté en progreso), igual que la web.
+  const aplicarTecnico = useMutation({
+    mutationFn: (a: AgendaItem) =>
+      api.post('tecnica/registros', { json: { obraId: a.obra.id, formularioId: a.formulario.id } }).json<{ id: number }>(),
+    onSuccess: ({ id }) => router.push(`/registro/TECNICA/${id}`),
+    onError: async (err) => Alert.alert('Error', await mensajeDeError(err, 'No se pudo abrir el formulario.')),
+  })
+  const abrir = d?.permisos.registrar.length
+    ? (a: AgendaItem) => {
+        if (!d.permisos.registrar.includes(a.area)) return
+        if (a.area === 'PREVENCION') router.push(`/registro/PREVENCION/${a.id}`)
+        else aplicarTecnico.mutate(a)
+      }
+    : undefined
 
   const salir = async () => {
     await authClient.signOut()
@@ -129,7 +152,7 @@ export default function Inicio() {
                 <Tarjeta style={{ padding: 0, overflow: 'hidden' }}>
                   <Text style={[styles.grupo, styles.grupoMal]}>Atrasadas · {d.agenda.atrasadas.length}</Text>
                   {d.agenda.atrasadas.length ? (
-                    d.agenda.atrasadas.map((a) => <FilaAgenda key={a.id} a={a} hoy={d.hoy} />)
+                    d.agenda.atrasadas.map((a) => <FilaAgenda key={a.id} a={a} hoy={d.hoy} onAbrir={abrir} />)
                   ) : (
                     <Text style={styles.vacio}>No tienes inspecciones atrasadas.</Text>
                   )}
@@ -137,7 +160,7 @@ export default function Inicio() {
                     Próximos {d.agenda.dias} días · {d.agenda.proximas.length}
                   </Text>
                   {d.agenda.proximas.length ? (
-                    d.agenda.proximas.map((a) => <FilaAgenda key={a.id} a={a} hoy={d.hoy} />)
+                    d.agenda.proximas.map((a) => <FilaAgenda key={a.id} a={a} hoy={d.hoy} onAbrir={abrir} />)
                   ) : (
                     <Text style={styles.vacio}>No tienes inspecciones programadas.</Text>
                   )}

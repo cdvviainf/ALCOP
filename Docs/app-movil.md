@@ -1,6 +1,7 @@
 # App móvil (Etapa 2) — Spec
 
 > Estado: **v0.1 borrador (12-11-2026)** — se levanta el stand by de la Etapa 2 (Christian, 12-11-2026, con OK del cliente a la Etapa 1; quedan pendientes ajustes de Dashboard y PDF en la web).
+> **Avance (27-11-2026):** implementadas las pantallas de terreno §5.1–5.6 — menú inferior (Inicio · Técnica · Prevención, según permisos), Visitas Técnica/Prevención (crear, agregar registros con fotos de cámara/galería, quitar, finalizar), Registros Técnica (aplicar formulario) y Prevención (agendados), llenado con todos los tipos de respuesta (incluida "Unidad (Lote)"), fotos por pregunta y cierre; "Mi agenda" abre el registro. Pendiente: §5.7 PDF y push. Notas técnicas: las fotos se suben con `XMLHttpRequest` (el `fetch` de Expo SDK 58 no acepta `{uri,name,type}` en FormData) y se muestran descargándolas con el cliente autenticado (en Android `<Image>` no envía el header `Cookie`).
 > Alcance comercial: `alcop-esquema.html` §04, §09 (Gantt Fase 2) y §11 — 63 UF, 15 días hábiles.
 
 ## 1. Propósito

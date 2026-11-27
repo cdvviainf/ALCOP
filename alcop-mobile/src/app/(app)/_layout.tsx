@@ -10,10 +10,16 @@ export default function AppLayout() {
         headerTintColor: colors.ink,
         headerTitleStyle: { fontWeight: '700' },
         headerShadowVisible: false,
+        headerBackButtonDisplayMode: 'minimal',
         contentStyle: { backgroundColor: colors.content },
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="visita/nueva" options={{ title: 'Nueva visita' }} />
+      <Stack.Screen name="visita/[area]/[id]/index" options={{ title: 'Visita' }} />
+      <Stack.Screen name="visita/[area]/[id]/hallazgo" options={{ title: 'Agregar registro' }} />
+      <Stack.Screen name="registro/nuevo" options={{ title: 'Aplicar formulario' }} />
+      <Stack.Screen name="registro/[area]/[id]" options={{ title: 'Registro' }} />
     </Stack>
   )
 }
